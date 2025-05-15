@@ -1,42 +1,49 @@
-<h1>Friendlai</h1>
-<form (submit)="send($event)">
-  <input type="text" name="query" placeholder="prompt" />
-  <div>
-    <select name="model">
-      @for(model of models; track model) {
-      <option>{{model}}</option>
-      }
-    </select>
-    <button type="submit">Send</button>
-  </div>
-</form>
+<div class="site-wrapper">
+  <header>
+    <h1>Friendlai</h1>
+  </header>
 
-<!-- @if(queries.isLoading()) {
-<div>Loading queries...</div>
-} @else  -->
-@if (queries.error()) {
-<div>Error: {{queries.error()}}</div>
-} @else if(queries.hasValue() && queries.value().length > 0) {
-<div style="padding: 1rem">
-  <table>
-    <thead>
-      <tr>
-        <th>Query</th>
-        <th>Model</th>
-        <th>Date</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    @for(query of queries.value(); track query.id) {
-    <tr>
-      <td><a [routerLink]="['/r', query.id]">{{query.query}}</a></td>
-      <td>{{query.model}}</td>
-      <td>{{query.date | date:'medium'}}</td>
-      <td>{{statusLookup[query.status] }}</td>
-    </tr>
+  <main>
+    <form class="prompt-form" (submit)="send($event)">
+      <textarea class="auto-grow" name="query" placeholder="Ask Friendlai"></textarea>
+      <div>
+        <select name="model">
+          @for(model of models; track model) {
+          <option>{{model}}</option>
+          }
+        </select>
+        <button ctype="submit">Send</button>
+      </div>
+    </form>
 
+    <!-- @if(queries.isLoading()) {
+    <div>Loading queries...</div>
+    } @else  -->
+    @if (queries.error()) {
+    <div class="container-error">Error: {{queries.error()}}</div>
+    } @else if(queries.hasValue() && queries.value().length > 0) {
+    <div style="padding: 1rem">
+      <table>
+        <thead>
+          <tr>
+            <th>Query</th>
+            <th>Model</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        @for(query of queries.value(); track query.id) {
+        <tr>
+          <td><a [routerLink]="['/r', query.id]">{{query.query}}</a></td>
+          <td>{{query.model}}</td>
+          <td>{{query.date | date:'medium'}}</td>
+          <td>{{statusLookup[query.status] }}</td>
+        </tr>
+
+        }
+      </table>
+    </div>
     }
-  </table>
+  </main>
+  <app-footer />
 </div>
-}
-<app-footer />
