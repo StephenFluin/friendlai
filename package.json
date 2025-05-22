@@ -42,5 +42,6 @@
   },
   "prettier": {
     "printWidth": 120
-  }
+  },
+  "license": "FSL-1.1-MIT"
 }
