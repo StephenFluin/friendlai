@@ -6,7 +6,6 @@ import { v4 as uuidv4 } from 'uuid';
   selector: 'app-home',
   imports: [],
   templateUrl: './home.html',
-  styles: ``,
 })
 export class Home {
   router = inject(Router);
