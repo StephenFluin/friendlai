@@ -21,8 +21,8 @@ const angularApp = new AngularNodeAppEngine();
 // MySQL Connection Pool
 const dbPool = mysql.createPool({
   host: process.env['DB_HOST'] || undefined,
-  user: process.env['DB_USER'] || 'root',
-  password: process.env['DB_PASSWORD'] || 'password',
+  user: process.env['DB_USER'] || 'friendlai' || 'root',
+  password: process.env['DB_PASSWORD_FRIENDLAI'] || 'password',
   database: process.env['DB_NAME'] || 'friendlai',
   socketPath: process.env['INSTANCE_UNIX_SOCKET'] || undefined, // e.g. '/cloudsql/project:region:instance'
   waitForConnections: true,
