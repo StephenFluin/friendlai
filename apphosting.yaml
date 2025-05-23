@@ -1,16 +1,17 @@
 scripts:
   buildCommand: ng build
   runCommand: npm run serve:ssr
+  vpcAccess:
+    networkInterfaces:
+    - network: default
 
 env:
   # npx firebase apphosting:secrets:grantaccess DB_PASSWORD --project friendlai-62296 --backend friendlai
   - variable: DB_PASSWORD
     secret: DB_PASSWORD_FRIENDLAI
+  - variable: DB_HOST
+    value: 10.110.64.3
   - variable: DB_USER
     value: friendlai
-  - variable: INSTANCE_UNIX_SOCKET
-    value: /cloudsql/friendlai-62296:us-central1:friendlai
-  - variable: CLOUD_SQL_CONNECTION_NAME
-    value: 'friendlai-62296:us-central1:friendlai'
   - variable: DB_PASSWORD_FRIENDLAI
     secret: DB_PASSWORD_FRIENDLAI
