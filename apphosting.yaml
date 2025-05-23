@@ -4,6 +4,7 @@ scripts:
   vpcAccess:
     networkInterfaces:
     - network: default
+      subnetwork: default
 
 env:
   # npx firebase apphosting:secrets:grantaccess DB_PASSWORD --project friendlai-62296 --backend friendlai
