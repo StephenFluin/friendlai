@@ -69,7 +69,7 @@ app.post('/api/queries', (req, res) => {
     })
     .catch((err) => {
       console.error('Error inserting query:', err);
-      res.status(500).send('Error inserting query');
+      res.status(500).send({ status: 'error', context: 'Error inserting query', msg: err });
     });
 });
 
