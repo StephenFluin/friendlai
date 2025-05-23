@@ -4,6 +4,6 @@ scripts:
 
 env:
   - variable: DB_PASSWORD
-    secret: projects/friendlai/secrets/secretID
+    secret: projects/friendlai/secrets/DB_PASSWORD
   - variable: INSTANCE_UNIX_SOCKET
     value: /cloudsql/friendlai-62296:us-central1:friendlai
