@@ -13,7 +13,6 @@ declare global {
   selector: 'app-root',
   imports: [RouterOutlet, RouterLink],
   templateUrl: './app.html',
-  styles: [],
 })
 export class App {
   router = inject(Router);

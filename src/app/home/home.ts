@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { v4 as uuidv4 } from 'uuid';
 
 @Component({
   selector: 'app-home',
@@ -15,9 +14,22 @@ export class Home {
     const formData = new FormData(form);
     const query = formData.get('query');
     console.log('Query:', query);
-    // Generate a random UUID for the result page using a library
-    const uuid = uuidv4();
-    console.log('Result Page ID:', uuid);
-    this.router.navigate(['/r', uuid]);
+
+    // POST to /api/queries with the data
+    fetch('/api/queries', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log('Server Response:', data);
+        this.router.navigate(['/r', data.uuid]);
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+      });
   }
 }
