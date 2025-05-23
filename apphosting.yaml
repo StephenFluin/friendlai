@@ -3,7 +3,8 @@ scripts:
   runCommand: npm run serve:ssr
 
 env:
+  # npx firebase apphosting:secrets:grantaccess DB_PASSWORD --project friendlai-62296 --backend friendlai
   - variable: DB_PASSWORD
-    secret: projects/friendlai/secrets/DB_PASSWORD
+    secret: DB_PASSWORD
   - variable: INSTANCE_UNIX_SOCKET
     value: /cloudsql/friendlai-62296:us-central1:friendlai
