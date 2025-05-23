@@ -1,3 +1,9 @@
 scripts:
   buildCommand: ng build
   runCommand: npm run serve:ssr
+
+env:
+  - variable: DB_PASSWORD
+    secret: projects/friendlai/secrets/secretID
+  - variable: INSTANCE_UNIX_SOCKET
+    value: /cloudsql/friendlai-62296:us-central1:friendlai
