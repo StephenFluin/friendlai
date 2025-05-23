@@ -8,3 +8,6 @@ env:
     secret: DB_PASSWORD
   - variable: INSTANCE_UNIX_SOCKET
     value: /cloudsql/friendlai-62296:us-central1:friendlai
+  - variable: CLOUD_SQL_CONNECTION_NAME
+    value: 'friendlai-62296:us-central1:friendlai'
+
