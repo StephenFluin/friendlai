@@ -29,6 +29,11 @@ const dbPool = mysql.createPool({
   connectionLimit: 10,
   queueLimit: 0,
 });
+if (process.env['INSTANCE_UNIX_SOCKET']) {
+  console.log('using socket for connection ', process.env['INSTANCE_UNIX_SOCKET']);
+} else {
+  console.log('Connecting to remote host ', process.env['DB_HOST']);
+}
 
 console.log('env is', process.env);
 /**
