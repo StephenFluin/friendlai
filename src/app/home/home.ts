@@ -3,6 +3,8 @@ import { httpResource } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
+export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
+
 @Component({
   selector: 'app-home',
   imports: [DatePipe, RouterLink],
@@ -11,8 +13,8 @@ import { Router, RouterLink } from '@angular/router';
 export class Home {
   router = inject(Router);
   queries = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
+  statusLookup = statusLookup;
 
-  statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
   constructor() {
     this.queries.isLoading();
   }

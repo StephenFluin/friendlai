@@ -1,7 +1,10 @@
 <p>What's your query?</p>
 <form (submit)="send($event)">
   <input type="text" name="query" />
-  <input type="text" name="model" value="gemma3:12b" />
+  <select name="model">
+    <option>deepseek-r1:1.5b</option>
+    <option>gemma3:12b</option>
+  </select>
   <button type="submit">Send</button>
 </form>
 

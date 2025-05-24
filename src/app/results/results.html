@@ -1,8 +1,23 @@
 <h2>Query Results</h2>
-@if(query.isLoading()) {
+@let q = query.value(); @if(query.isLoading()) {
 <div>loading...</div>
 } @else if (query.error()) {
 <div>{{query.error()}}</div>
-} @else {
-<div>{{query.value() | json}}</div>
+} @else if (q) {
+<div><strong>Prompt:</strong> {{q.query}}</div>
+<div><strong>Model:</strong> {{q.model}}</div>
+<div><strong>Created:</strong> {{q.date | date:'medium'}}</div>
+<div><strong>Last Updated:</strong> {{q.updated | date:'medium'}}</div>
+<div><strong>Status:</strong> {{statusLookup[q.status]}}</div>
+@if(q.result) {
+<div>
+  <strong>Result:</strong>
+  <pre>{{q.result | processResponse}}</pre>
+</div>
+<div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
+} @else if(q.error_message) {
+<div>ERROR: {{q.error_message}}</div>
+}
+<div>{{q | json}}</div>
+<div></div>
 }
