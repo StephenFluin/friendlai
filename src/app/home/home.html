@@ -22,7 +22,7 @@
   </thead>
   @for(query of queries.value(); track query.id) {
   <tr>
-    <td>@if(query.status ===2 ) {<a [routerLink]="['/r', query.id]">{{query.query}}</a>} @else { {{query.query}} }</td>
+    <td>@if(query.status ===3 ) {<a [routerLink]="['/r', query.id]">{{query.query}}</a>} @else { {{query.query}} }</td>
     <td>{{query.model}}</td>
     <td>{{query.date | date:'medium'}}</td>
     <td>{{statusLookup[query.status] }}</td>

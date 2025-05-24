@@ -290,7 +290,8 @@ async function main() {
 
       if (prompt) {
         try {
-          const [resultText, processing_time_ms] = await runOllamaPrompt(prompt.query, prompt.model);
+          const [resultText, processing_time_ns] = await runOllamaPrompt(prompt.query, prompt.model);
+          const processing_time_ms = Math.round(processing_time_ns / 1000);
           await updatePrompt(db, prompt.id, 3, { resultText, processing_time_ms });
         } catch (ollamaError: any) {
           console.error(`Failed to process prompt ID ${prompt.id}:`, ollamaError.message);

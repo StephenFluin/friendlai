@@ -12,7 +12,7 @@ export class Home {
   router = inject(Router);
   queries = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
 
-  statusLookup = ['Pending Assignment', 'Processing', 'Success', 'Failed'];
+  statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
   constructor() {
     this.queries.isLoading();
   }
