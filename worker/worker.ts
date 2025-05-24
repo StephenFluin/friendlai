@@ -189,8 +189,9 @@ async function runOllamaPrompt(promptText: string, modelName: string): Promise<[
 
     // Calculate time passed
     const startTime = Date.now();
-    const { stdout, stderr } = await exec(command, { timeout: 10 * 60 * 1000 }); // 10 minute timeout
+    const { stdout, stderr } = await exec(command, { timeout: 0.5 * 60 * 1000 }); // 10 minute timeout
     const processing_time_ms = Date.now() - startTime;
+    console.log('past processing', stdout, stderr);
 
     if (stderr) {
       if (stderr.toLowerCase().includes('error')) {
@@ -217,7 +218,7 @@ async function runOllamaPrompt(promptText: string, modelName: string): Promise<[
         const escapedPromptText = promptText.replace(/"/g, '\\"');
         const command = `ollama run "${modelName}" "${escapedPromptText}"`;
         const startTime = Date.now();
-        const { stdout } = await exec(command, { timeout: 10 * 60 * 1000 });
+        const { stdout } = await exec(command, { timeout: 1 * 60 * 1000 });
         const processing_time_ms = Date.now() - startTime;
         return [stdout.trim(), processing_time_ms];
       } catch (pullError: any) {
@@ -249,7 +250,7 @@ async function updatePrompt(
 ): Promise<void> {
   try {
     await db.execute(
-      'UPDATE queries SET status = ?, result = ?, error_message = ?, processing_time_ms = ? updated = NOW() WHERE id = ?',
+      'UPDATE queries SET status = ?, result = ?, error_message = ?, processing_time_ms = ?, updated = NOW() WHERE id = ?',
       [status || 4, resultText || null, errorMessage || null, processing_time_ms || null, promptId]
     );
     console.log(`Prompt ID: ${promptId} updated to status: ${status}.`);
