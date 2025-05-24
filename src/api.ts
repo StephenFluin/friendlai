@@ -34,6 +34,10 @@ export const registerAPI = (app: Express) => {
         res.status(500).send({ status: 'error', context: 'Error inserting query', msg: err });
       });
   });
+  app.get('/api/queries', async (req, res) => {
+    const result = await executeQuery('SELECT id, query, date_created FROM queries');
+    res.json({ queryList: result });
+  });
 
   app.get('/api/queries/:id', async (req, res) => {
     const queryId = req.params.id;

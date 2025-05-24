@@ -1,13 +1,18 @@
+import { JsonPipe } from '@angular/common';
+import { httpResource } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-home',
-  imports: [],
+  imports: [JsonPipe],
   templateUrl: './home.html',
 })
 export class Home {
   router = inject(Router);
+  posts = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
+  constructor() {}
+
   send(event: SubmitEvent) {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
