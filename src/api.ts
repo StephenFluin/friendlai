@@ -4,16 +4,23 @@ import mysql, { RowDataPacket, OkPacket, ResultSetHeader, FieldPacket } from 'my
 
 export const registerAPI = (app: Express) => {
   // MySQL Connection Pool
-  const dbPool = mysql.createPool({
+  const dbConfig = {
     host: process.env['DB_HOST'] || undefined,
     user: process.env['DB_USER'] || 'friendlai' || 'root',
-    password: process.env['DB_PASSWORD_FRIENDLAI'] || 'password',
+    password: process.env['DB_PASSWORD_FRIENDLAI'] || undefined,
     database: process.env['DB_NAME'] || 'friendlai',
-    socketPath: process.env['INSTANCE_UNIX_SOCKET'] || undefined, // e.g. '/cloudsql/project:region:instance'
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-  });
+  };
+
+  if (!dbConfig.host || !dbConfig.password) {
+    console.log('Database connection not configured properly.');
+    process.exit(1);
+  }
+  const dbPool = mysql.createPool(dbConfig);
+  console.log('Database connection details:', dbConfig);
+
   if (process.env['INSTANCE_UNIX_SOCKET']) {
     console.log('Connecting to DB host via socket ', process.env['INSTANCE_UNIX_SOCKET']);
   } else {
@@ -23,7 +30,8 @@ export const registerAPI = (app: Express) => {
   app.post('/api/queries', (req, res) => {
     const queryId = uuidv4();
     const query = req.body.query;
-    executeQuery('INSERT INTO queries (id, query) VALUES (?, ?)', [queryId, query])
+    const model = req.body.model;
+    executeQuery('INSERT INTO queries (id, query, model) VALUES (?, ?, ?)', [queryId, query, model])
       .then(() => {
         // Respond with the generated ID
         console.log('Inserted query with ID:', queryId);
@@ -35,13 +43,13 @@ export const registerAPI = (app: Express) => {
       });
   });
   app.get('/api/queries', async (req, res) => {
-    const result = await executeQuery('SELECT id, query, date_created FROM queries');
-    res.json({ queryList: result });
+    const result = await executeQuery('SELECT id, query, status, date FROM queries');
+    res.json(result);
   });
 
   app.get('/api/queries/:id', async (req, res) => {
     const queryId = req.params.id;
-    const results = await executeQuery<RowDataPacket[]>('SELECT query FROM results WHERE id = ?', [queryId]);
+    const results = await executeQuery<RowDataPacket[]>('SELECT * FROM queries WHERE id = ?', [queryId]);
     if (results.length > 0) {
       res.json(results[0]);
     } else {
@@ -73,8 +81,6 @@ export const registerAPI = (app: Express) => {
     res.json({ id: queryId });
   });
 
-  console.log('env is', process.env);
-
   /**
    * Executes a SQL query against the database pool.
    * @param sql The SQL query string. Can contain '?' placeholders for parameters.
@@ -94,7 +100,7 @@ export const registerAPI = (app: Express) => {
       const [results, fields] = await dbPool.query(sql, params);
       return results as T;
     } catch (error) {
-      console.error('SQL Error executing query:', sql, 'Params:', params, 'Error:', error);
+      //console.error('SQL Error executing query:', sql, 'Params:', params, 'Error:', error);
       throw error; // Re-throw the error for the caller to handle
     }
   }

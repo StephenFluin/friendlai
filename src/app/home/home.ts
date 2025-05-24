@@ -1,24 +1,28 @@
-import { JsonPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-home',
-  imports: [JsonPipe],
+  imports: [DatePipe, RouterLink],
   templateUrl: './home.html',
 })
 export class Home {
   router = inject(Router);
-  posts = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
-  constructor() {}
+  queries = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
+
+  statusLookup = ['Pending Assignment', 'Processing', 'Success', 'Failed'];
+  constructor() {
+    this.queries.isLoading();
+  }
 
   send(event: SubmitEvent) {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
     const formData = new FormData(form);
     const query = formData.get('query');
-    console.log('Query:', query);
+    const model = formData.get('model');
 
     // POST to /api/queries with the data
     fetch('/api/queries', {
@@ -26,12 +30,12 @@ export class Home {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, model }),
     })
       .then((response) => response.json())
       .then((data) => {
         console.log('Server Response:', data);
-        this.router.navigate(['/r', data.uuid]);
+        this.router.navigate(['/r', data.id]);
       })
       .catch((error) => {
         console.error('Error:', error);

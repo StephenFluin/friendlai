@@ -1,2 +1,8 @@
-<p>results works!</p>
-<p>Stay tuned for actual results soon.</p>
+<h2>Query Results</h2>
+@if(query.isLoading()) {
+<div>loading...</div>
+} @else if (query.error()) {
+<div>{{query.error()}}</div>
+} @else {
+<div>{{query.value() | json}}</div>
+}

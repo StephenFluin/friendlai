@@ -1,8 +1,33 @@
 <p>What's your query?</p>
 <form (submit)="send($event)">
   <input type="text" name="query" />
+  <input type="text" name="model" value="gemma3:12b" />
   <button type="submit">Send</button>
 </form>
 
-<div>Posts:</div>
-{{posts.value() | json}}
+<div>Queries:</div>
+@if(queries.isLoading()) {
+<div>Loading...</div>
+} @else if (queries.error()) {
+<div>Error: {{queries.error()}}</div>
+} @else {
+<table>
+  <thead>
+    <tr>
+      <th>Query</th>
+      <th>Model</th>
+      <th>Date</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  @for(query of queries.value(); track query.id) {
+  <tr>
+    <td>@if(query.status ===2 ) {<a [routerLink]="['/r', query.id]">{{query.query}}</a>} @else { {{query.query}} }</td>
+    <td>{{query.model}}</td>
+    <td>{{query.date | date:'medium'}}</td>
+    <td>{{statusLookup[query.status] }}</td>
+  </tr>
+
+  }
+</table>
+}
