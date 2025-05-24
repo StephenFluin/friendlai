@@ -17,7 +17,4 @@
 <div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
 } @else if(q.error_message) {
 <div>ERROR: {{q.error_message}}</div>
-}
-<div>{{q | json}}</div>
-<div></div>
-}
+} }
