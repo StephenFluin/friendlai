@@ -192,6 +192,14 @@ export async function runOllamaPrompt(promptText: string, modelName: string): Pr
   // You can configure the host if needed: new Ollama({ host: "http://custom_host:port" })
   const ollama = new Ollama();
   console.log(`Running prompt with model "${modelName}" using Ollama JS API...`);
+  const models = await ollama.list();
+  models.models[0].model;
+  if (!models.models.find((item) => item.model === modelName)) {
+    console.log(`Model "${modelName}" not found. Pulling requested models...`);
+    await ollama.pull({ model: modelName });
+    console.log('model downloaded!');
+  }
+
   const response: GenerateResponse = await ollama.generate({
     model: modelName,
     prompt: promptText,
@@ -295,6 +303,7 @@ async function main() {
           await updatePrompt(db, prompt.id, 3, { resultText, processing_time_ms });
         } catch (ollamaError: any) {
           console.error(`Failed to process prompt ID ${prompt.id}:`, ollamaError.message);
+
           await updatePrompt(db, prompt.id, 4, { errorMessage: ollamaError.message });
         }
       } else {
