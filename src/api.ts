@@ -43,7 +43,7 @@ export const registerAPI = (app: Express) => {
       });
   });
   app.get('/api/queries', async (req, res) => {
-    const result = await executeQuery('SELECT id, query, status, date FROM queries');
+    const result = await executeQuery('SELECT * FROM queries');
     res.json(result);
   });
 

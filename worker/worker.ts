@@ -180,52 +180,167 @@ async function getPendingPrompt(db: mysql.Connection): Promise<any | null> {
  * @param modelName - The name of the Ollama model to use.
  * @returns The result text from Ollama.
  */
-async function runOllamaPrompt(promptText: string, modelName: string): Promise<[string, number]> {
-  console.log(`Running prompt with model "${modelName}"...`);
-  try {
-    const escapedPromptText = promptText.replace(/"/g, '\\"');
-    const command = `ollama run "${modelName}" "${escapedPromptText}"`;
-    console.log(`Executing: ${command}`);
+import { Ollama, GenerateResponse, ProgressResponse } from 'ollama';
 
-    // Calculate time passed
-    const startTime = Date.now();
-    const { stdout, stderr } = await exec(command, { timeout: 0.5 * 60 * 1000 }); // 10 minute timeout
-    const processing_time_ms = Date.now() - startTime;
-    console.log('past processing', stdout, stderr);
+// Define timeouts based on the original script's values
+const DEFAULT_RUN_TIMEOUT_MS = 30 * 1000; // 30 seconds for initial attempt
+const PULL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes for model pulling
+const RETRY_RUN_TIMEOUT_MS = 1 * 60 * 1000; // 1 minute for retry attempt after pull
 
-    if (stderr) {
-      if (stderr.toLowerCase().includes('error')) {
-        console.warn(`Ollama stderr for prompt "${promptText.substring(0, 30)}..." with model ${modelName}:`, stderr);
-      } else if (stderr.trim() !== '') {
-        console.log(
-          `Ollama stderr (info) for prompt "${promptText.substring(0, 30)}..." with model ${modelName}:`,
-          stderr
+/**
+ * Runs a prompt against the Ollama API, with logic to pull the model if not found.
+ *
+ * @param promptText The text of the prompt.
+ * @param modelName The name of the model to use (e.g., "llama3:latest").
+ * @returns A promise that resolves to a tuple: [responseText, processingTimeMs].
+ */
+export async function runOllamaPromptJs(promptText: string, modelName: string): Promise<[string, number]> {
+  // Initialize the Ollama client. Assumes Ollama server is running on default host (http://localhost:11434).
+  // You can configure the host if needed: new Ollama({ host: "http://custom_host:port" })
+  const ollama = new Ollama();
+
+  console.log(`Running prompt with model "${modelName}" using Ollama JS API...`);
+
+  // Helper function to perform the generate call with timeout
+  const performGenerate = async (
+    currentModelName: string,
+    currentPromptText: string,
+    timeoutMs: number
+  ): Promise<[string, number]> => {
+    const abortController = new AbortController();
+    let timeoutId: NodeJS.Timeout;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const timeoutMessage = `Ollama JS API call for model "${currentModelName}" timed out after ${timeoutMs}ms.`;
+        console.warn(timeoutMessage);
+        abortController.abort(); // Signal the ollama call to abort
+        // Note: AbortError will be thrown by ollama.generate, this timeoutPromise is a safeguard.
+        // We don't reject here directly to let AbortError propagate if ollama respects the signal.
+      }, timeoutMs);
+    });
+
+    try {
+      const startTimeForFallback = Date.now(); // Fallback if total_duration is missing
+
+      // The actual API call, raced with our timeout
+      // `ollama.generate` should throw an AbortError if `abortController.abort()` is called.
+      const response: GenerateResponse = await Promise.race([
+        ollama.generate({
+          model: currentModelName,
+          prompt: currentPromptText,
+          stream: false, // Get the full response at once
+          signal: abortController.signal,
+        }),
+        timeoutPromise, // This promise will ensure timeout if generate doesn't respond to abort quickly
+      ]);
+
+      clearTimeout(timeoutId!); // Clear the timeout if generate completed/failed on its own
+
+      const processing_time_ms = response.total_duration
+        ? Math.round(response.total_duration / 1_000_000)
+        : Date.now() - startTimeForFallback;
+
+      if (response.total_duration === undefined) {
+        console.warn(
+          `total_duration missing in Ollama response for model "${currentModelName}". Using manual timing: ${processing_time_ms}ms.`
         );
       }
-    }
-    console.log(`Successfully ran prompt with model "${modelName}".`);
-    return [stdout.trim(), processing_time_ms];
-  } catch (error: any) {
-    console.error(`Error running Ollama for model "${modelName}":`, error.message);
-    if (error.stdout) console.error('Ollama stdout on error:', error.stdout);
-    if (error.stderr) console.error('Ollama stderr on error:', error.stderr);
 
-    if (error.message.includes('Modelfile not found') || (error.stderr && error.stderr.includes('model_not_found'))) {
-      console.log(`Attempting to pull model: ${modelName}`);
+      console.log(`Successfully ran prompt with model "${currentModelName}". Time: ${processing_time_ms}ms.`);
+      return [response.response.trim(), processing_time_ms];
+    } catch (error: any) {
+      clearTimeout(timeoutId!); // Ensure timeout is cleared on any error
+      if (error.name === 'AbortError') {
+        // This error comes from abortController.abort() being respected by ollama.generate or fetch
+        const message = `Ollama prompt generation for model "${currentModelName}" timed out after ${timeoutMs}ms.`;
+        console.error(message);
+        throw new Error(message);
+      }
+      // Rethrow other errors to be handled by the main try-catch
+      throw error;
+    }
+  };
+
+  try {
+    // Initial attempt
+    return await performGenerate(modelName, promptText, DEFAULT_RUN_TIMEOUT_MS);
+  } catch (error: any) {
+    console.error(`Error running Ollama prompt for model "${modelName}": ${error.message}`);
+    if (error.cause) {
+      console.error('Error cause:', error.cause);
+    }
+
+    // Check for model not found error
+    // Ollama API error for missing model typically includes "not found" and the model name.
+    const isModelNotFoundError =
+      error.message && error.message.toLowerCase().includes('not found') && error.message.includes(modelName);
+
+    if (isModelNotFoundError) {
+      console.log(`Model "${modelName}" not found or inaccessible. Attempting to pull model...`);
+
+      const pullAbortController = new AbortController();
+      let pullTimeoutId: NodeJS.Timeout;
+
+      const pullTimeoutPromise = new Promise<never>((_, reject) => {
+        pullTimeoutId = setTimeout(() => {
+          const timeoutMessage = `Ollama pull for model "${modelName}" timed out after ${PULL_TIMEOUT_MS}ms.`;
+          console.warn(timeoutMessage);
+          pullAbortController.abort();
+        }, PULL_TIMEOUT_MS);
+      });
+
       try {
-        await exec(`ollama pull "${modelName}"`, { timeout: 600000 }); // 10 minutes timeout for pulling
-        console.log(`Successfully pulled model ${modelName}. Retrying prompt...`);
-        const escapedPromptText = promptText.replace(/"/g, '\\"');
-        const command = `ollama run "${modelName}" "${escapedPromptText}"`;
-        const startTime = Date.now();
-        const { stdout } = await exec(command, { timeout: 1 * 60 * 1000 });
-        const processing_time_ms = Date.now() - startTime;
-        return [stdout.trim(), processing_time_ms];
+        const pullOperation = async () => {
+          const pullStream = await ollama.pull({
+            model: modelName,
+            stream: true, // Iterate over progress
+            signal: pullAbortController.signal,
+          });
+
+          let lastStatus = '';
+          let pullFailedInStream = false;
+          console.log(`Pulling "${modelName}" (this may take up to ${PULL_TIMEOUT_MS / 60000} minutes)...`);
+
+          for await (const progress of pullStream) {
+            lastStatus = progress.status;
+            if (progress.error) {
+              console.error(`Error detail during pull stream for "${modelName}": ${progress.error}`);
+              pullFailedInStream = true;
+              throw new Error(`Streamed pull for "${modelName}" reported an error: ${progress.error}`);
+            }
+            // You can log more detailed progress here if desired:
+            // console.log(`Pulling ${modelName}: ${progress.status} ${progress.completed || ''}/${progress.total || ''}`);
+          }
+
+          if (!pullFailedInStream) {
+            // A successful pull typically ends with a status like "success".
+            // If the stream completes without `progress.error`, it's generally successful.
+            console.log(`Pull stream for "${modelName}" completed. Last status: ${lastStatus}`);
+          }
+        };
+
+        await Promise.race([pullOperation(), pullTimeoutPromise]);
+        clearTimeout(pullTimeoutId!);
+
+        console.log(`Successfully pulled model "${modelName}" (or it was already up-to-date). Retrying prompt...`);
+        // Retry the prompt generation with the retry timeout
+        return await performGenerate(modelName, promptText, RETRY_RUN_TIMEOUT_MS);
       } catch (pullError: any) {
-        console.error(`Failed to pull model ${modelName}:`, pullError.message);
-        throw new Error(`Failed to pull model ${modelName} and run prompt: ${pullError.message}`);
+        clearTimeout(pullTimeoutId!);
+        const baseMessage = `Failed to pull model "${modelName}"`;
+        if (pullError.name === 'AbortError') {
+          console.error(`${baseMessage}: Pull operation timed out after ${PULL_TIMEOUT_MS}ms.`);
+          throw new Error(`${baseMessage} (timeout).`);
+        }
+        console.error(`${baseMessage}: ${pullError.message}`);
+        // Include original model-not-found error as cause if helpful, or just the pull error
+        throw new Error(`${baseMessage}. Original error: ${error.message}. Pull error: ${pullError.message}`);
       }
     }
+
+    // If the error was not a "model not found" error, or if retrying after pull also failed,
+    // rethrow the current error.
     throw error;
   }
 }
