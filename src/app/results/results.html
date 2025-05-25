@@ -1,5 +1,5 @@
 <h2>Query Results</h2>
-@let q = query.value(); @if(query.isLoading()) {
+@let q = query.value(); @if(query.isLoading() && !query.hasValue()) {
 <div>loading...</div>
 } @else if (query.error()) {
 <div>{{query.error()}}</div>
@@ -9,12 +9,20 @@
 <div><strong>Created:</strong> {{q.date | date:'medium'}}</div>
 <div><strong>Last Updated:</strong> {{q.updated | date:'medium'}}</div>
 <div>
-  <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) {<button (click)="retry()">Retry</button>}
+  <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) { @if(retrying) {
+  <div class="spinner"></div>
+  } @else {<button (click)="retry()">Retry</button>} }
 </div>
-@if(q.result) {
+@if(q.status === 0 || q.status === 1) {
+<div><div class="spinner" style="width: 100px; height: 100px"></div></div>
+@if(q.status === 0) {
+<p>The queue is nearly empty, your prompt should be processing soon.</p>
+} @if(q.status === 1) {
+<p>Processing time depends on the model you choose.</p>
+} } @if(q.result) {
 <div>
   <strong>Result:</strong>
-  <pre>{{q.result | processResponse}}</pre>
+  <div [innerHTML]="renderedResult()"></div>
 </div>
 <div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
 } @else if(q.error_message) {

@@ -5,8 +5,11 @@ import { Pipe, PipeTransform } from '@angular/core';
 })
 export class ProcessResponsePipe implements PipeTransform {
   transform(value: string, ...args: unknown[]): string {
-    // Remove <think> </think> and everything inbetween
-    const result = value.replace(/<think>[\s\S]*?<\/think>/g, '');
-    return result;
+    return process(value);
   }
 }
+export const process = (value: string) => {
+  // Remove <think> </think> and everything inbetween
+  const result = value.replace(/<think>[\s\S]*?<\/think>/g, '');
+  return result;
+};
