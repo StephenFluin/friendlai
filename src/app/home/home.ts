@@ -15,6 +15,25 @@ export class Home {
   queries = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
   statusLookup = statusLookup;
 
+  models = [
+    'deepseek-r1:1.5b',
+    'deepseek-r1:7b',
+    'deepseek-r1:8b',
+    'deepseek-r1:14b',
+    'deepseek-r1:32b',
+    'qwen3:0.6b',
+    'qwen3:1.7b',
+    'qwen3:4b',
+    'qwen3:8b',
+    'qwen3:14b',
+    'qwen3:30b',
+    'devstral:24b',
+    'gemma3:1b',
+    'gemma3:4b',
+    'gemma3:12b',
+    'gemma3:27b',
+  ];
+
   constructor() {
     this.queries.isLoading();
   }

@@ -2,8 +2,9 @@
 <form (submit)="send($event)">
   <input type="text" name="query" />
   <select name="model">
-    <option>deepseek-r1:1.5b</option>
-    <option>gemma3:12b</option>
+    @for(model of models; track model) {
+    <option>{{model}}</option>
+    }
   </select>
   <button type="submit">Send</button>
 </form>
@@ -25,7 +26,7 @@
   </thead>
   @for(query of queries.value(); track query.id) {
   <tr>
-    <td>@if(query.status ===3 ) {<a [routerLink]="['/r', query.id]">{{query.query}}</a>} @else { {{query.query}} }</td>
+    <td><a [routerLink]="['/r', query.id]">{{query.query}}</a></td>
     <td>{{query.model}}</td>
     <td>{{query.date | date:'medium'}}</td>
     <td>{{statusLookup[query.status] }}</td>

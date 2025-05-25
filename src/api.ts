@@ -31,25 +31,36 @@ export const registerAPI = (app: Express) => {
     const queryId = uuidv4();
     const query = req.body.query;
     const model = req.body.model;
-    executeQuery('INSERT INTO queries (id, query, model) VALUES (?, ?, ?)', [queryId, query, model])
+    runQuery('INSERT INTO queries (id, query, model) VALUES (?, ?, ?)', [queryId, query, model])
       .then(() => {
         // Respond with the generated ID
         console.log('Inserted query with ID:', queryId);
         res.send({ id: queryId });
       })
-      .catch((err) => {
+      .catch((err: any) => {
         console.error('Error inserting query:', err);
         res.status(500).send({ status: 'error', context: 'Error inserting query', msg: err });
       });
   });
   app.get('/api/queries', async (req, res) => {
-    const result = await executeQuery('SELECT * FROM queries');
+    const result = await runQuery('SELECT * FROM queries ORDER BY updated DESC');
     res.json(result);
+  });
+  app.post('/api/queries/:id/retry', async (req, res) => {
+    const queryId = req.params.id;
+    const [results, fields] = await dbPool.execute<ResultSetHeader>('UPDATE queries SET status = 0 WHERE id = ?', [
+      queryId,
+    ]);
+    if (results.affectedRows > 0) {
+      res.send({ status: 'success', message: 'Query refreshed successfully' });
+    } else {
+      res.status(404).send({ status: 'error', message: 'Query not found' });
+    }
   });
 
   app.get('/api/queries/:id', async (req, res) => {
     const queryId = req.params.id;
-    const results = await executeQuery<RowDataPacket[]>('SELECT * FROM queries WHERE id = ?', [queryId]);
+    const results = await runQuery<RowDataPacket[]>('SELECT * FROM queries WHERE id = ?', [queryId]);
     if (results.length > 0) {
       res.json(results[0]);
     } else {
@@ -61,7 +72,7 @@ export const registerAPI = (app: Express) => {
     const queryId = req.params.id;
     const result = req.body.result;
     // Update the results table with the provided `result` for the given `queryId`
-    executeQuery('UPDATE results SET result = ? WHERE id = ?', [result, queryId])
+    runQuery('UPDATE results SET result = ? WHERE id = ?', [result, queryId])
       .then(() => {
         console.log('Updated result for ID:', queryId);
         res.status(200).send('Result updated');
@@ -74,7 +85,7 @@ export const registerAPI = (app: Express) => {
 
   app.get('/api/queries/:id/results', async (req, res) => {
     const queryId = req.params.id;
-    const results = await executeQuery<RowDataPacket[]>('SELECT result FROM results WHERE id = ?', [queryId]);
+    const results = await runQuery<RowDataPacket[]>('SELECT result FROM results WHERE id = ?', [queryId]);
     if (results.length > 0) {
       res.json(results[0]);
     }
@@ -90,10 +101,7 @@ export const registerAPI = (app: Express) => {
    *          For INSERT/UPDATE/DELETE, this can be an OkPacket or ResultSetHeader.
    * @throws Re-throws any error encountered during query execution.
    */
-  async function executeQuery<T = RowDataPacket[] | OkPacket | ResultSetHeader>(
-    sql: string,
-    params?: any[]
-  ): Promise<T> {
+  async function runQuery<T = RowDataPacket[] | ResultSetHeader>(sql: string, params?: any[]): Promise<T> {
     let connection;
     try {
       // The pool's query method handles connection acquisition and release

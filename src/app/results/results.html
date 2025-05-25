@@ -8,7 +8,9 @@
 <div><strong>Model:</strong> {{q.model}}</div>
 <div><strong>Created:</strong> {{q.date | date:'medium'}}</div>
 <div><strong>Last Updated:</strong> {{q.updated | date:'medium'}}</div>
-<div><strong>Status:</strong> {{statusLookup[q.status]}}</div>
+<div>
+  <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) {<button (click)="retry()">Retry</button>}
+</div>
 @if(q.result) {
 <div>
   <strong>Result:</strong>

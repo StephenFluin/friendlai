@@ -38,4 +38,9 @@ export class Results {
       console.log('new query value:', this.query.value());
     });
   }
+  retry() {
+    fetch(`/api/queries/${this.route.snapshot.params['id']}/retry`, {
+      method: 'POST',
+    });
+  }
 }
