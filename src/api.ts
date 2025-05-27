@@ -31,7 +31,9 @@ export const registerAPI = (app: Express) => {
     const queryId = uuidv4();
     const query = req.body.query;
     const model = req.body.model;
-    runQuery('INSERT INTO queries (id, query, model) VALUES (?, ?, ?)', [queryId, query, model])
+    // get user from bearer token or from body
+    const user = req.body.user || req.headers.authorization?.replace('Bearer ', '') || 'anonymous';
+    runQuery('INSERT INTO queries (id, query, model, user) VALUES (?, ?, ?, ?)', [queryId, query, model, user])
       .then(() => {
         // Respond with the generated ID
         console.log('Inserted query with ID:', queryId);
@@ -43,7 +45,9 @@ export const registerAPI = (app: Express) => {
       });
   });
   app.get('/api/queries', async (req, res) => {
-    const result = await runQuery('SELECT * FROM queries ORDER BY updated DESC');
+    const user = req.body?.user || req.headers.authorization?.replace('Bearer ', '') || 'anonymous';
+
+    const result = await runQuery('SELECT * FROM queries WHERE user = ? ORDER BY updated DESC', [user]);
     res.json(result);
   });
   app.post('/api/queries/:id/retry', async (req, res) => {

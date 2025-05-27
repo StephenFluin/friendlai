@@ -11,11 +11,12 @@
   </div>
 </form>
 
-@if(queries.isLoading()) {
+<!-- @if(queries.isLoading()) {
 <div>Loading queries...</div>
-} @else if (queries.error()) {
+} @else  -->
+@if (queries.error()) {
 <div>Error: {{queries.error()}}</div>
-} @else {
+} @else if(queries.hasValue() && queries.value().length > 0) {
 <div style="padding: 1rem">
   <table>
     <thead>

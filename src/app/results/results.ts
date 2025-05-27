@@ -52,7 +52,16 @@ export class Results {
   query = httpResource<Query>(() => {
     // Auto-refresh
     this.every30();
-    return `/api/queries/${this.route.snapshot.params['id']}`;
+    return {
+      url: `/api/queries/${this.route.snapshot.params['id']}`,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        /* no user yet because we don't know how to SSR this
+        Authorization: `Bearer ${localStorage.getItem('userId')}`,
+        */
+      },
+    };
   });
 
   renderedResult = computed<SafeHtml | null>(() => {

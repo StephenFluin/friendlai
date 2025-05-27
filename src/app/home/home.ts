@@ -1,8 +1,9 @@
 import { DatePipe } from '@angular/common';
-import { httpResource } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Footer } from '../footer/footer';
+import { User } from '../user';
+import { httpResource } from '@angular/common/http';
 
 export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
 
@@ -14,7 +15,21 @@ export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Succ
 })
 export class Home {
   router = inject(Router);
-  queries = httpResource<any[]>(() => '/api/queries', { defaultValue: [] });
+  userService = inject(User);
+
+  queries = httpResource<any[]>(
+    () => ({
+      url: '/api/queries',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.userService.id}`,
+      },
+    }),
+    {
+      defaultValue: [],
+    }
+  );
   statusLookup = statusLookup;
 
   models = [
@@ -57,15 +72,18 @@ export class Home {
       return;
     }
 
+    const userId = this.userService.id;
+
     // POST to /api/queries with the data
     fetch('/api/queries', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${userId}`,
       },
       body: JSON.stringify({ query, model }),
     })
-      .then((response) => response.json())
+      .then((response) => response.json()) // TODO: Add proper error handling for non-ok responses
       .then((data) => {
         console.log('Server Response:', data);
         this.router.navigate(['/r', data.id]);
