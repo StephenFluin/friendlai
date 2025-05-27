@@ -1,1 +1,82 @@
-/* You can add global styles to this file, and also import other style files */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  background-color: #121212; /* Dark background */
+  color: #e0e0e0; /* Light text */
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: #9370db;
+  text-decoration: none;
+}
+a:visited {
+  color: #68497e;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+#page {
+  width: 800px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+p {
+  line-height: 1.6;
+  margin-bottom: 1rem;
+}
+li {
+  margin-bottom: 0.5rem;
+}
+ol,
+ul {
+  padding-left: 1.5rem;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #9370db; /* Medium Purple for headings */
+  margin-bottom: 1rem;
+}
+
+.table-container {
+  margin-top: 2rem;
+  width: 80%;
+}
+
+/* Tables with alternating rows */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #3a3a3a; /* Darker border for separation */
+}
+
+th {
+  color: #9370db; /* Medium Purple headers */
+}
+
+tr:nth-child(odd) {
+  background-color: #222; /* Slightly lighter dark gray for odd rows */
+}
+
+tr:nth-child(even) {
+  background-color: #1e1e1e; /* Darker gray for even rows */
+}

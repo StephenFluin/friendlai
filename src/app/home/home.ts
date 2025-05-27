@@ -2,13 +2,15 @@ import { DatePipe } from '@angular/common';
 import { httpResource } from '@angular/common/http';
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { Footer } from '../footer/footer';
 
 export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
 
 @Component({
   selector: 'app-home',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, Footer],
   templateUrl: './home.html',
+  styleUrls: ['./home.scss'],
 })
 export class Home {
   router = inject(Router);
@@ -44,6 +46,16 @@ export class Home {
     const formData = new FormData(form);
     const query = formData.get('query');
     const model = formData.get('model');
+
+    if (!query || !model) {
+      console.error('Query and model are required');
+      return;
+    }
+    const queryStr = typeof query === 'string' ? query : '';
+    if (queryStr.length < 5) {
+      console.error('Query must be at least 5 characters long');
+      return;
+    }
 
     // POST to /api/queries with the data
     fetch('/api/queries', {

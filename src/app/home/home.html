@@ -1,37 +1,41 @@
-<p>What's your query?</p>
+<h1 class="site-title">Friendlai</h1>
 <form (submit)="send($event)">
-  <input type="text" name="query" />
-  <select name="model">
-    @for(model of models; track model) {
-    <option>{{model}}</option>
-    }
-  </select>
-  <button type="submit">Send</button>
+  <input type="text" name="query" placeholder="prompt" />
+  <div>
+    <select name="model">
+      @for(model of models; track model) {
+      <option>{{model}}</option>
+      }
+    </select>
+    <button type="submit">Send</button>
+  </div>
 </form>
 
-<div>Queries:</div>
 @if(queries.isLoading()) {
-<div>Loading...</div>
+<div>Loading queries...</div>
 } @else if (queries.error()) {
 <div>Error: {{queries.error()}}</div>
 } @else {
-<table>
-  <thead>
+<div style="padding: 1rem">
+  <table>
+    <thead>
+      <tr>
+        <th>Query</th>
+        <th>Model</th>
+        <th>Date</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    @for(query of queries.value(); track query.id) {
     <tr>
-      <th>Query</th>
-      <th>Model</th>
-      <th>Date</th>
-      <th>Status</th>
+      <td><a [routerLink]="['/r', query.id]">{{query.query}}</a></td>
+      <td>{{query.model}}</td>
+      <td>{{query.date | date:'medium'}}</td>
+      <td>{{statusLookup[query.status] }}</td>
     </tr>
-  </thead>
-  @for(query of queries.value(); track query.id) {
-  <tr>
-    <td><a [routerLink]="['/r', query.id]">{{query.query}}</a></td>
-    <td>{{query.model}}</td>
-    <td>{{query.date | date:'medium'}}</td>
-    <td>{{statusLookup[query.status] }}</td>
-  </tr>
 
-  }
-</table>
+    }
+  </table>
+</div>
 }
+<app-footer />
