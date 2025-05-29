@@ -11,12 +11,10 @@ body {
   padding: 0;
 }
 
-a {
+a,
+a:visited {
   color: #9370db;
   text-decoration: none;
-}
-a:visited {
-  color: #68497e;
 }
 a:hover {
   text-decoration: underline;
@@ -42,12 +40,18 @@ ul {
 }
 
 h1,
+h1 a:link,
+h1 a:visited {
+  font-size: 3rem;
+  color: rgb(132, 27, 168);
+}
+h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  color: #9370db; /* Medium Purple for headings */
+  color: rgb(132, 27, 168);
   margin-bottom: 1rem;
 }
 
@@ -79,4 +83,8 @@ tr:nth-child(odd) {
 
 tr:nth-child(even) {
   background-color: #1e1e1e; /* Darker gray for even rows */
+}
+
+.footer-links a {
+  margin-right: 8px;
 }

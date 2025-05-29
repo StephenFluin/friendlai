@@ -7,6 +7,25 @@ import { httpResource } from '@angular/common/http';
 
 export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
 
+export const models = [
+  'deepseek-r1:32b',
+  'deepseek-r1:14b',
+  'deepseek-r1:8b',
+  'deepseek-r1:7b',
+  'deepseek-r1:1.5b',
+  'qwen3:30b',
+  'qwen3:14b',
+  'qwen3:8b',
+  'qwen3:4b',
+  'qwen3:1.7b',
+  'qwen3:0.6b',
+  'devstral:24b',
+  'gemma3:27b',
+  'gemma3:12b',
+  'gemma3:4b',
+  'gemma3:1b',
+];
+
 @Component({
   selector: 'app-home',
   imports: [DatePipe, RouterLink, Footer],
@@ -16,6 +35,8 @@ export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Succ
 export class Home {
   router = inject(Router);
   userService = inject(User);
+
+  models = models;
 
   queries = httpResource<any[]>(
     () => ({
@@ -31,25 +52,6 @@ export class Home {
     }
   );
   statusLookup = statusLookup;
-
-  models = [
-    'deepseek-r1:32b',
-    'deepseek-r1:14b',
-    'deepseek-r1:8b',
-    'deepseek-r1:7b',
-    'deepseek-r1:1.5b',
-    'qwen3:30b',
-    'qwen3:14b',
-    'qwen3:8b',
-    'qwen3:4b',
-    'qwen3:1.7b',
-    'qwen3:0.6b',
-    'devstral:24b',
-    'gemma3:27b',
-    'gemma3:12b',
-    'gemma3:4b',
-    'gemma3:1b',
-  ];
 
   constructor() {
     this.queries.isLoading();

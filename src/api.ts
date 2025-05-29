@@ -1,4 +1,4 @@
-import { Express } from 'express';
+import { Express, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import mysql, { RowDataPacket, OkPacket, ResultSetHeader, FieldPacket } from 'mysql2/promise';
 
@@ -28,24 +28,68 @@ export const registerAPI = (app: Express) => {
   }
 
   app.post('/api/queries', (req, res) => {
-    const queryId = uuidv4();
     const query = req.body.query;
     const model = req.body.model;
-    // get user from bearer token or from body
-    const user = req.body.user || req.headers.authorization?.replace('Bearer ', '') || 'anonymous';
-    runQuery('INSERT INTO queries (id, query, model, user) VALUES (?, ?, ?, ?)', [queryId, query, model, user])
-      .then(() => {
-        // Respond with the generated ID
-        console.log('Inserted query with ID:', queryId);
+    const user = getBearer(req);
+    const result = newQuery(query, model, user, res);
+    result
+      .then((queryId) => {
         res.send({ id: queryId });
       })
-      .catch((err: any) => {
-        console.error('Error inserting query:', err);
+      .catch((err) => {
+        console.error('Error creating query:', err);
         res.status(500).send({ status: 'error', context: 'Error inserting query', msg: err });
       });
   });
+
+  app.post('/api/multis', async (req, res) => {
+    const query = req.body.query;
+    const models = req.body.checkedModels;
+    const user = getBearer(req);
+    if (!query || !models || models.length < 2) {
+      res.status(400).send({ status: 'error', message: 'Query and at least two models are required' });
+      return;
+    }
+    const multiId = uuidv4();
+    const queryIds: string[] = [];
+    for (const model of models) {
+      const newId = await newQuery(query, model, user, res);
+      if (newId) {
+        queryIds.push(newId);
+      } else {
+        console.log('Failed to create query for model:', model);
+        res.status(500).send({ status: 'error', message: 'Failed to create query for model: ' + model });
+        return;
+      }
+    }
+    const inserts = queryIds.map((id) => [multiId, id]);
+    console.log('Inserting a bunch of row:', inserts);
+    runQuery('INSERT INTO multis (id, query) VALUES ?', [inserts])
+      .then(() => {
+        console.log('Inserted multi with ID:', multiId);
+        res.send({ id: multiId });
+      })
+      .catch((err) => {
+        console.error('Error inserting multi:', err);
+        res.status(500).send({ status: 'error', message: 'Error inserting multi', error: err.message });
+      });
+  });
+
+  app.get('/api/multis/:id', async (req, res) => {
+    const multiId = req.params.id;
+    const results = await runQuery<RowDataPacket[]>(
+      'SELECT q.* FROM multis m LEFT JOIN queries q ON q.id = m.query WHERE m.id = ?',
+      [multiId]
+    );
+    if (results.length > 0) {
+      res.json(results);
+    } else {
+      res.status(404).send('Multi not found');
+    }
+  });
+
   app.get('/api/queries', async (req, res) => {
-    const user = req.body?.user || req.headers.authorization?.replace('Bearer ', '') || 'anonymous';
+    const user = getBearer(req);
 
     const result = await runQuery('SELECT * FROM queries WHERE user = ? ORDER BY updated DESC', [user]);
     res.json(result);
@@ -73,6 +117,7 @@ export const registerAPI = (app: Express) => {
   });
 
   app.post('/api/queries/:id/results', (req, res) => {
+    const r = req;
     const queryId = req.params.id;
     const result = req.body.result;
     // Update the results table with the provided `result` for the given `queryId`
@@ -115,5 +160,24 @@ export const registerAPI = (app: Express) => {
       //console.error('SQL Error executing query:', sql, 'Params:', params, 'Error:', error);
       throw error; // Re-throw the error for the caller to handle
     }
+  }
+  /*
+  Create a query /prompt in the system
+  */
+  function newQuery(query: string, model: string, user: string, res: Response): Promise<string | null> {
+    const queryId = uuidv4();
+    return runQuery('INSERT INTO queries (id, query, model, user) VALUES (?, ?, ?, ?)', [queryId, query, model, user])
+      .then(() => {
+        // Respond with the generated ID
+        console.log('Inserted query with ID:', queryId);
+        return queryId;
+      })
+      .catch((err: any) => {
+        console.error('Error inserting query:', err);
+        return null;
+      });
+  }
+  function getBearer(req: Request): string {
+    return req.body?.user || req.headers.authorization?.replace('Bearer ', '') || 'anonymous';
   }
 };

@@ -8,24 +8,12 @@ import { ProcessResponsePipe } from '../process-response-pipe';
 import markdownit from 'markdown-it';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { process } from '../process-response-pipe';
-
-export interface Query {
-  id: string;
-  query: string;
-  model: string;
-  date: string;
-  status: number;
-  updated: string;
-  result?: string;
-  processing_time_ms?: number;
-  error_message?: string;
-  user: string;
-}
+import { Query } from '../results/results';
 
 @Component({
-  selector: 'app-results',
+  selector: 'app-multi-results',
   imports: [DatePipe, JsonPipe, ProcessResponsePipe],
-  templateUrl: './results.html',
+  templateUrl: './multi-results.html',
   styles: `.spinner {
     display:inline-block;
   width: 1ex;
@@ -42,7 +30,7 @@ export interface Query {
   }
 }`,
 })
-export class Results {
+export class MultiResults {
   route = inject(ActivatedRoute);
   refreshers = inject(Refresher);
   sanitizer = inject(DomSanitizer);
@@ -51,36 +39,38 @@ export class Results {
   retrying = false;
 
   every30 = this.refreshers.getRefresher(30 * 1000);
-  query = httpResource<Query>(() => {
+  querySet = httpResource<Query[]>(() => {
     // Auto-refresh
     this.every30();
     return {
-      url: `/api/queries/${this.route.snapshot.params['id']}`,
+      url: `/api/multis/${this.route.snapshot.params['id']}`,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        /* no user yet because we don't know how to SSR this
-        Authorization: `Bearer ${localStorage.getItem('userId')}`,
-        */
       },
     };
   });
 
-  renderedResult = computed<SafeHtml | null>(() => {
-    let q = this.query.value();
-    if (q && q.result) {
-      let md = new markdownit();
-      return this.sanitizer.bypassSecurityTrustHtml(md.render(process(q.result)));
-    } else {
-      return null;
+  renderedResults = computed<(SafeHtml | null)[] | []>(() => {
+    let qSet = this.querySet.value();
+    let md = new markdownit();
+    if (!qSet || !Array.isArray(qSet)) {
+      return [];
     }
+    return qSet.map((q) => {
+      if (q && q.result) {
+        return this.sanitizer.bypassSecurityTrustHtml(md.render(process(q.result)));
+      } else {
+        return null;
+      }
+    });
   });
   constructor() {
     effect(() => {
-      console.log('new query value:', this.query.value());
+      console.log('new query value:', this.querySet.value());
     });
     effect(() => {
-      this.query.value();
+      this.querySet.value();
       this.retrying = false;
     });
   }

@@ -1,0 +1,15 @@
+<h2>Multi Query</h2>
+<form (submit)="send($event)">
+  <input type="text" name="query" placeholder="prompt" />
+  <div>
+    <div>
+      @for(model of models; track model) {
+      <label style="display: block">
+        <input type="checkbox" name="models[]" [value]="model" />
+        {{model}}
+      </label>
+      }
+    </div>
+    <button type="submit">Send</button>
+  </div>
+</form>
