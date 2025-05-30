@@ -6,22 +6,23 @@
 } @else if (qSet) {
 <h3>Prompt: {{qSet[0].query}}</h3>
 @for(q of qSet;track q.id) {
-<div><strong>Model:</strong> {{q.model}}</div>
-@if(q.status != 3) {
-<div>
-  <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) { @if(retrying) {
-  <div class="spinner"></div>
-  } @else {<button (click)="retry()">Retry</button>} }
-</div>
-} @if(q.status === 0 || q.status === 1) {
-<div><div class="spinner" style="width: 100px; height: 100px"></div></div>
-} @if(q.result) {
-<div>
-  <div [innerHTML]="renderedResults()[$index]"></div>
-</div>
-<div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
-} @else if(q.error_message) {
-<div>ERROR: {{q.error_message}}</div>
-}
-<hr />
+<fieldset>
+  <legend>Model: {{q.model}}</legend>
+  @if(q.status != 3) {
+  <div>
+    <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) { @if(retrying) {
+    <div class="spinner"></div>
+    } @else {<button (click)="retry()">Retry</button>} }
+  </div>
+  } @if(q.status === 0 || q.status === 1) {
+  <div><div class="spinner" style="width: 100px; height: 100px"></div></div>
+  } @if(q.result) {
+  <div>
+    <div [innerHTML]="renderedResults()[$index]"></div>
+  </div>
+  <div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
+  } @else if(q.error_message) {
+  <div>ERROR: {{q.error_message}}</div>
+  }
+</fieldset>
 } }
