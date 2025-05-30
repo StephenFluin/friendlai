@@ -62,9 +62,9 @@ export const registerAPI = (app: Express) => {
         return;
       }
     }
-    const inserts = queryIds.map((id) => [multiId, id]);
+    const inserts = queryIds.map((id) => [multiId, id, user, query]);
     console.log('Inserting a bunch of row:', inserts);
-    runQuery('INSERT INTO multis (id, query) VALUES ?', [inserts])
+    runQuery('INSERT INTO multis (id, query, user, prompt) VALUES ?', [inserts])
       .then(() => {
         console.log('Inserted multi with ID:', multiId);
         res.send({ id: multiId });
@@ -78,7 +78,7 @@ export const registerAPI = (app: Express) => {
   app.get('/api/multis/:id', async (req, res) => {
     const multiId = req.params.id;
     const results = await runQuery<RowDataPacket[]>(
-      'SELECT q.* FROM multis m LEFT JOIN queries q ON q.id = m.query WHERE m.id = ?',
+      'SELECT q.* FROM multis m LEFT JOIN queries q ON q.id = m.query WHERE m.id = ? ORDER BY q.model DESC',
       [multiId]
     );
     if (results.length > 0) {
@@ -86,6 +86,15 @@ export const registerAPI = (app: Express) => {
     } else {
       res.status(404).send('Multi not found');
     }
+  });
+
+  app.get('/api/multis', async (req, res) => {
+    const user = getBearer(req);
+    const results = await runQuery<RowDataPacket[]>(
+      'SELECT m.id, m.prompt FROM multis m WHERE user = ? GROUP BY m.id,m.prompt,m.date ORDER BY date DESC ',
+      [user]
+    );
+    res.json(results);
   });
 
   app.get('/api/queries', async (req, res) => {

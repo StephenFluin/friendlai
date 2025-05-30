@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { models } from '../home/home';
 import { User } from '../user';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
+import { httpResource } from '@angular/common/http';
 
 @Component({
   selector: 'app-multi',
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './multi.html',
 })
 export class Multi {
@@ -13,6 +14,17 @@ export class Multi {
   router = inject(Router);
 
   models = models;
+
+  multiList = httpResource<{ id: string; prompt: string }[]>(() => {
+    return {
+      url: '/api/multis',
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.userService.id}`,
+      },
+    };
+  });
   send(event: SubmitEvent) {
     event.preventDefault();
     const form = event.target as HTMLFormElement;

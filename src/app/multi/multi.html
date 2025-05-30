@@ -13,3 +13,20 @@
     <button type="submit">Send</button>
   </div>
 </form>
+
+@if(multiList.isLoading() && !multiList.hasValue()) {
+<div>loading...</div>
+} @else if (multiList.error()) {
+<div>{{multiList.error()}}</div>
+} @else if (multiList.value()) {
+<div>
+  <h3>Previous Multi Queries</h3>
+  <ul>
+    @for(q of multiList.value(); track q.id) {
+    <li>
+      <a [routerLink]="['/m', q.id]">{{q.prompt}}</a>
+    </li>
+    }
+  </ul>
+</div>
+}

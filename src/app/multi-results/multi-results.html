@@ -3,28 +3,25 @@
 <div>loading...</div>
 } @else if (querySet.error()) {
 <div>{{querySet.error()}}</div>
-} @else if (qSet) { @for(q of qSet;track q.id) {
-<div><strong>Prompt:</strong> {{q.query}}</div>
+} @else if (qSet) {
+<h3>Prompt: {{qSet[0].query}}</h3>
+@for(q of qSet;track q.id) {
 <div><strong>Model:</strong> {{q.model}}</div>
-<div><strong>Created:</strong> {{q.date | date:'medium'}}</div>
-<div><strong>Last Updated:</strong> {{q.updated | date:'medium'}}</div>
+@if(q.status != 3) {
 <div>
   <strong>Status:</strong> {{statusLookup[q.status]}} @if(q.status == 4) { @if(retrying) {
   <div class="spinner"></div>
   } @else {<button (click)="retry()">Retry</button>} }
 </div>
-@if(q.status === 0 || q.status === 1) {
+} @if(q.status === 0 || q.status === 1) {
 <div><div class="spinner" style="width: 100px; height: 100px"></div></div>
-@if(q.status === 0) {
-<p>The queue is nearly empty, your prompt should be processing soon.</p>
-} @if(q.status === 1) {
-<p>Processing time depends on the model you choose.</p>
-} } @if(q.result) {
+} @if(q.result) {
 <div>
-  <strong>Result:</strong>
   <div [innerHTML]="renderedResults()[$index]"></div>
 </div>
 <div><strong>Time Taken:</strong> {{(q.processing_time_ms || 0) / 1000}} seconds</div>
 } @else if(q.error_message) {
 <div>ERROR: {{q.error_message}}</div>
-} } }
+}
+<hr />
+} }
