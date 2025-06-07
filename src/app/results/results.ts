@@ -6,7 +6,7 @@ import { Refresher } from '../refresher';
 import { statusLookup } from '../home/home';
 import { ProcessResponsePipe } from '../process-response-pipe';
 import markdownit from 'markdown-it';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { process } from '../process-response-pipe';
 
 export interface Query {
@@ -76,11 +76,13 @@ export class Results {
     }
   });
   constructor() {
+    const title = inject(Title);
     effect(() => {
       console.log('new query value:', this.query.value());
     });
     effect(() => {
       this.query.value();
+      title.setTitle(`Friendlai - ${this.query?.value()?.query || 'Query Results'}`);
       this.retrying = false;
     });
   }

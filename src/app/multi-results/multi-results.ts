@@ -6,7 +6,7 @@ import { Refresher } from '../refresher';
 import { statusLookup } from '../home/home';
 import { ProcessResponsePipe } from '../process-response-pipe';
 import markdownit from 'markdown-it';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer, SafeHtml, Title } from '@angular/platform-browser';
 import { process } from '../process-response-pipe';
 import { Query } from '../results/results';
 
@@ -66,11 +66,14 @@ export class MultiResults {
     });
   });
   constructor() {
+    const title = inject(Title);
     effect(() => {
       console.log('new query value:', this.querySet.value());
     });
     effect(() => {
       this.querySet.value();
+      title.setTitle(`Friendlai - ${this.querySet?.value()?.[0]?.query || 'Query Results'}`);
+
       this.retrying = false;
     });
   }
