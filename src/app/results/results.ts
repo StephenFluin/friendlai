@@ -65,9 +65,10 @@ export class Results {
       },
     };
   });
+  queryNice = computed(() => this.query.value(), { equal: (_, b) => b === undefined });
 
   renderedResult = computed<SafeHtml | null>(() => {
-    let q = this.query.value();
+    let q = this.queryNice();
     if (q && q.result) {
       let md = new markdownit();
       return this.sanitizer.bypassSecurityTrustHtml(md.render(process(q.result)));
@@ -77,9 +78,7 @@ export class Results {
   });
   constructor() {
     const title = inject(Title);
-    effect(() => {
-      console.log('new query value:', this.query.value());
-    });
+
     effect(() => {
       this.query.value();
       title.setTitle(`Friendlai - ${this.query?.value()?.query || 'Query Results'}`);
