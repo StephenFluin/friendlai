@@ -150,6 +150,45 @@ export const registerAPI = (app: Express) => {
     res.json({ id: queryId });
   });
 
+  app.get('/api/worker/query', async (req, res) => {
+    console.log('Worker fetching query');
+    // Check and clean up any timed out queries
+    const timeoutThreshold = 10 * 60 * 1000; // 10 minute
+    const worker = getBearer(req);
+    // This endpoint is for the worker to fetch a query to process
+    const results = await runQuery<RowDataPacket[]>('SELECT * FROM queries WHERE status = 0 ORDER BY date ASC LIMIT 1');
+    if (results.length > 0) {
+      res.json(results[0]);
+      // Mark worker as in progress
+      await runQuery('UPDATE queries SET status = 1 WHERE id = ? LIMIT 1', [results[0]['id']]);
+      await runQuery('INSERT INTO works (id, query, worker, status) VALUES (?, ?, ?, ?)', [
+        uuidv4(),
+        results[0]['id'],
+        worker,
+        0, // Pending
+      ]);
+    } else {
+      res.send([]);
+    }
+  });
+
+  app.put('/api/worker/query/:id', async (req, res) => {
+    // This endpoint is for the worker to update the status of a query after processing
+    const queryId = req.params.id;
+    const { status, result, error_message, processing_time_ms } = req.body;
+    const worker = getBearer(req);
+
+    await runQuery(
+      'UPDATE queries SET status = ?, result = ?, error_message = ?, processing_time_ms = ? WHERE id = ?',
+      [status, result, error_message, processing_time_ms, queryId]
+    );
+    await runQuery(
+      'INSERT INTO works (id, query, worker, status, processing_time_ms, error_message) VALUES (?, ?, ?, ?)',
+      [uuidv4(), queryId, worker, status, processing_time_ms, error_message || null]
+    );
+    res.send({ status: 'success' });
+  });
+
   /**
    * Executes a SQL query against the database pool.
    * @param sql The SQL query string. Can contain '?' placeholders for parameters.

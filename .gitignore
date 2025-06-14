@@ -7,6 +7,7 @@
 /bazel-out
 
 .env
+worker.json
 
 # Node
 /node_modules

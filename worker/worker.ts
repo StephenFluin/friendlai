@@ -1,9 +1,10 @@
 import * as child_process from 'child_process';
 import * as os from 'os';
 import * as util from 'util';
-import mysql from 'mysql2/promise';
+import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import { GenerateResponse, Ollama } from 'ollama';
+import { v4 as uuidv4 } from 'uuid';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -13,18 +14,16 @@ const exec = util.promisify(child_process.exec);
 
 // --- Configuration ---
 // Database credentials will now be primarily sourced from the .env file
-const dbConfig = {
-  host: process.env.DB_HOST || undefined,
-  user: process.env.DB_USER || 'friendlai', // Default if not in .env
-  password: process.env.DB_PASSWORD_FRIENDLAI || undefined, // Default if not in .env
-  database: process.env.DB_NAME || 'friendlai', // Default if not in .env
-  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
+const config = {
+  host: process.env.HOST || 'https://friendlai.xyz',
 };
 
-if (!dbConfig.host || !dbConfig.password) {
-  console.log('Database connection not configured properly.');
-  process.exit(1);
+// Read worker ID from worker.json
+if (!fs.existsSync('worker.json')) {
+  fs.writeFileSync('worker.json', JSON.stringify({ id: uuidv4() }));
 }
+const workerConfig = JSON.parse(fs.readFileSync('worker.json', 'utf8'));
+const workerId = process.env.WORKER_ID || workerConfig.id;
 
 const OLLAMA_INSTALL_URL = 'https://ollama.com/install.sh';
 const POLLING_INTERVAL_SECONDS = process.env.POLLING_INTERVAL_SECONDS
@@ -116,62 +115,47 @@ async function ensureOllamaIsReady(): Promise<void> {
   }
 }
 
-// --- Database Functions ---
-
-let dbConnection: mysql.Connection | null = null;
-
-/**
- * Establishes a connection to the MySQL database.
- */
-async function connectToDB(): Promise<mysql.Connection> {
-  if (dbConnection) {
-    try {
-      await dbConnection.ping();
-      return dbConnection;
-    } catch (pingError) {
-      console.warn('Database connection lost, attempting to reconnect...');
-      dbConnection.destroy(); // Properly close the broken connection
-      dbConnection = null;
-    }
-  }
-  try {
-    console.log('Attempting to connect to database with config:', {
-      host: dbConfig.host,
-      user: dbConfig.user,
-      // Avoid logging password directly
-      password: dbConfig.password ? '******' : undefined,
-      database: dbConfig.database,
-      port: dbConfig.port,
-    });
-    const connection = await mysql.createConnection(dbConfig);
-    console.log('Successfully connected to the MySQL database.');
-    dbConnection = connection;
-    return connection;
-  } catch (error) {
-    console.error('Error connecting to MySQL database:', error);
-    throw error;
-  }
-}
-
 /**
  * Fetches the oldest pending prompt from the database and sets its status to 'processing'.
  * @param db - The MySQL connection object.
  * @returns The prompt object or null if no pending prompts are found.
  */
-async function getPendingPrompt(db: mysql.Connection): Promise<any | null> {
-  await db.beginTransaction();
-  const [rows]: [any[], any] = await db.execute(
-    'SELECT id, query, model FROM queries WHERE status = 0 ORDER BY date ASC LIMIT 1 FOR UPDATE'
-  );
-
-  if (rows.length === 0) {
-    await db.commit();
+async function getPendingPrompt(): Promise<any | null> {
+  // Use fetch to fetch queries from /api/worker/queries
+  const path = `${config.host}/api/worker/query`;
+  const queries = await fetch(path, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${workerId}`,
+    },
+  });
+  if (!queries.ok) {
+    console.log(queries);
+    console.error(`Failed to fetch pending prompts from ${path}: ${queries.statusText}`);
     return null;
   }
-  const prompt = rows[0];
-  await db.execute('UPDATE queries SET status = 1, updated = NOW() WHERE id = ?', [prompt.id]);
-  await db.commit();
-  console.log(`Processing prompt ID: ${prompt.id}`);
+  const data = await queries.json();
+  if (Array.isArray(data) && data.length === 0) {
+    console.log(`No pending prompts found at ${path}.`);
+    return null;
+  } else {
+    console.log(`Found ${data.length} pending prompts at ${path}.`);
+  }
+
+  // Post a status update to the server via fetch to api
+  const prompt = data;
+  console.log(`Found pending prompt ID: ${prompt.id}, query: "${prompt.query}"`);
+  // Update the prompt status to 'processing' (status = 1)
+  fetch(`${config.host}/api/worker/query/${prompt.id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${workerId}`,
+    },
+    body: JSON.stringify({ status: 1 }), // Set status to 'processing'
+  });
+
   return prompt;
 }
 
@@ -220,7 +204,6 @@ export async function runOllamaPrompt(promptText: string, modelName: string): Pr
  * @param errorMessage - An error message if processing failed (optional).
  */
 async function updatePrompt(
-  db: mysql.Connection,
   promptId: number,
   status: 3 | 4,
   {
@@ -230,11 +213,19 @@ async function updatePrompt(
   }: { resultText?: string; errorMessage?: string; processing_time_ms?: number }
 ): Promise<void> {
   try {
-    await db.execute(
-      'UPDATE queries SET status = ?, result = ?, error_message = ?, processing_time_ms = ?, updated = NOW() WHERE id = ?',
-      [status || 4, resultText || null, errorMessage || null, processing_time_ms || null, promptId]
-    );
-    console.log(`Prompt ID: ${promptId} updated to status: ${status}.`);
+    await fetch(`${config.host}/api/worker/query/${promptId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${workerId}`,
+      },
+      body: JSON.stringify({
+        status,
+        result: resultText || null,
+        error_message: errorMessage || null,
+        processing_time_ms: processing_time_ms || null,
+      }),
+    });
   } catch (error) {
     console.error(`Error updating prompt ID ${promptId}:`, error);
   }
@@ -252,59 +243,20 @@ async function main() {
     process.exit(1);
   }
 
-  let db: mysql.Connection;
-  try {
-    db = await connectToDB();
-  } catch (dbError) {
-    console.error('Failed to connect to database initially. Exiting.', dbError);
-    process.exit(1);
-  }
-
-  const gracefulShutdown = async (signal: string) => {
-    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
-    if (dbConnection) {
-      try {
-        await dbConnection.end();
-        console.log('Database connection closed.');
-      } catch (err) {
-        console.error('Error closing database connection:', err);
-      }
-    }
-    process.exit(0);
-  };
-
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
   while (true) {
     let prompt: any = null;
     try {
-      // Ensure DB connection is alive before attempting to get a prompt
-      if (!dbConnection) {
-        console.log('Database connection is not active. Attempting to reconnect...');
-        db = await connectToDB(); // This will re-assign to the global dbConnection as well
-      } else {
-        // Ping to check, mysql2/promise might handle some reconnections internally
-        // but an explicit check can be good.
-        try {
-          await db.ping();
-        } catch (pingErr) {
-          console.warn('DB Ping failed. Attempting to reconnect...', pingErr);
-          db = await connectToDB();
-        }
-      }
-
-      prompt = await getPendingPrompt(db);
+      prompt = await getPendingPrompt();
 
       if (prompt) {
         try {
           const [resultText, processing_time_ns] = await runOllamaPrompt(prompt.query, prompt.model);
           const processing_time_ms = Math.round(processing_time_ns / 1000000);
-          await updatePrompt(db, prompt.id, 3, { resultText, processing_time_ms });
+          await updatePrompt(prompt.id, 3, { resultText, processing_time_ms });
         } catch (ollamaError: any) {
           console.error(`Failed to process prompt ID ${prompt.id}:`, ollamaError.message);
 
-          await updatePrompt(db, prompt.id, 4, { errorMessage: ollamaError.message });
+          await updatePrompt(prompt.id, 4, { errorMessage: ollamaError.message });
         }
       } else {
         console.log(`No pending prompts found. Sleeping for ${POLLING_INTERVAL_SECONDS} seconds...`);
@@ -312,9 +264,9 @@ async function main() {
       }
     } catch (error: any) {
       console.error('An error occurred in the main loop:', error.message);
-      if (prompt && prompt.id && dbConnection) {
+      if (prompt && prompt.id) {
         try {
-          await updatePrompt(db, prompt.id, 4, { errorMessage: `Main loop error: ${error.message.substring(0, 500)}` });
+          await updatePrompt(prompt.id, 4, { errorMessage: `Main loop error: ${error.message.substring(0, 500)}` });
         } catch (updateErr) {
           console.error('Additionally, failed to update prompt status after main loop error:', updateErr);
         }
@@ -331,9 +283,6 @@ async function main() {
 if (require.main === module) {
   main().catch((error) => {
     console.error('Unhandled error in main execution:', error);
-    if (dbConnection) {
-      dbConnection.end().catch((err) => console.error('Error closing DB on unhandled main error:', err));
-    }
     process.exit(1);
   });
 }
