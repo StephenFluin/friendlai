@@ -150,17 +150,24 @@ export const registerAPI = (app: Express) => {
     res.json({ id: queryId });
   });
 
+  app.get('/api/worker/models', async (req, res) => {
+    // This endpoint is for the worker to fetch the list of models
+    const results = await runQuery<RowDataPacket[]>(`SELECT DISTINCT model
+      FROM queries
+      WHERE date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)`);
+    res.json(results.map((row) => row['model']));
+  });
   app.get('/api/worker/query', async (req, res) => {
-    console.log('Worker fetching query');
     // Check and clean up any timed out queries
     const timeoutThreshold = 10 * 60 * 1000; // 10 minute
     const worker = getBearer(req);
+    console.log(`Worker ${worker} fetching query`);
     // This endpoint is for the worker to fetch a query to process
     const results = await runQuery<RowDataPacket[]>('SELECT * FROM queries WHERE status = 0 ORDER BY date ASC LIMIT 1');
     if (results.length > 0) {
       res.json(results[0]);
       // Mark worker as in progress
-      await runQuery('UPDATE queries SET status = 1 WHERE id = ? LIMIT 1', [results[0]['id']]);
+      // await runQuery('UPDATE queries SET status = 1 WHERE id = ? LIMIT 1', [results[0]['id']]);
       await runQuery('INSERT INTO works (id, query, worker, status) VALUES (?, ?, ?, ?)', [
         uuidv4(),
         results[0]['id'],
@@ -175,8 +182,17 @@ export const registerAPI = (app: Express) => {
   app.put('/api/worker/query/:id', async (req, res) => {
     // This endpoint is for the worker to update the status of a query after processing
     const queryId = req.params.id;
-    const { status, result, error_message, processing_time_ms } = req.body;
+    const [status, result, error_message, processing_time_ms] = [
+      req.body.status || -1,
+      req.body.result || null,
+      req.body.error_message || null,
+      req.body.processing_time_ms || null,
+    ];
     const worker = getBearer(req);
+
+    console.log(
+      `Using ${status}, ${result}, ${error_message}, ${processing_time_ms} for query ${queryId} by worker ${worker}`
+    );
 
     await runQuery(
       'UPDATE queries SET status = ?, result = ?, error_message = ?, processing_time_ms = ? WHERE id = ?',

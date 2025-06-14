@@ -7,7 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr": "node dist/friendlai/server/server.mjs"
+    "serve:ssr": "node dist/friendlai/server/server.mjs",
+    "worker": "HOST=http://localhost:4200 npx tsx watch worker/worker.ts"
   },
   "private": true,
   "dependencies": {

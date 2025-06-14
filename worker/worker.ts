@@ -107,12 +107,60 @@ async function ensureOllamaIsReady(): Promise<void> {
     }
   }
   try {
-    await exec('ollama list');
+    const modelsRaw = await exec('ollama list');
+
     console.log('Ollama server appears to be running.');
+    const models = modelsRaw.stdout
+      .split('\n')
+      .slice(1)
+      .map((line) => line.split(/\s+/)[0].trim());
+    console.log('Available models:', models.join(', ') || 'No models found.');
+    await fetchMissingModels(models);
   } catch (error) {
     console.warn('Ollama server might not be running or responding. `ollama run` might start it.');
     console.warn('If you encounter issues, ensure the Ollama application/service is running.');
   }
+}
+
+async function fetchMissingModels(models: string[]) {
+  const requiredModels: string[] = await fetch(`${config.host}/api/worker/models`)
+    .then((response) => response.json())
+    .then((data) => data || [])
+    .catch((error) => {
+      console.error('Failed to fetch required models:', error);
+      return [];
+    });
+
+  console.log('Required models:', requiredModels.join(', '));
+  const missingModels = requiredModels.filter((model) => !models.includes(model));
+  if (missingModels.length > 0) {
+    console.log('Missing models found:', missingModels.join(', '));
+    // Logic to fetch missing models goes here
+    for (const model of missingModels) {
+      try {
+        console.log(`Pulling missing model: ${model}`);
+        const ollama = new Ollama();
+        const stream = await ollama.pull({ model, stream: true });
+        // Give progress updates every 10 seconds
+        let time = Date.now() - 10000;
+        for await (const progress of stream) {
+          if (Date.now() - time > 10000) {
+            time = Date.now();
+            console.log(
+              `Pulling ${model}: ${progress.status} ${
+                Math.round((progress.completed / 1024 / 1024 / 1024) * 10) / 10 || ''
+              }GB/${Math.round((progress.total / 1024 / 1024 / 1024) * 10) / 10 || ''}GB`
+            );
+          }
+        }
+        console.log(`Successfully pulled model: ${model}`);
+      } catch (error) {
+        console.error(`Failed to pull model "${model}":`, error);
+      }
+      console.log('moving to next model...');
+    }
+  }
+  console.log('All required models are available.');
 }
 
 /**
@@ -250,6 +298,14 @@ async function main() {
 
       if (prompt) {
         try {
+          fetch(`${config.host}/api/worker/query/${prompt.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${workerId}`,
+            },
+            body: JSON.stringify({ id: prompt.id, status: 1 }), // Set status to 'processing'
+          });
           const [resultText, processing_time_ns] = await runOllamaPrompt(prompt.query, prompt.model);
           const processing_time_ms = Math.round(processing_time_ns / 1000000);
           await updatePrompt(prompt.id, 3, { resultText, processing_time_ms });
