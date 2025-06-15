@@ -157,13 +157,45 @@ export const registerAPI = (app: Express) => {
       WHERE date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)`);
     res.json(results.map((row) => row['model']));
   });
-  app.get('/api/worker/query', async (req, res) => {
+  app.post('/api/worker/fetch-query', async (req, res) => {
     // Check and clean up any timed out queries
     const timeoutThreshold = 10 * 60 * 1000; // 10 minute
     const worker = getBearer(req);
-    console.log(`Worker ${worker} fetching query`);
-    // This endpoint is for the worker to fetch a query to process
-    const results = await runQuery<RowDataPacket[]>('SELECT * FROM queries WHERE status = 0 ORDER BY date ASC LIMIT 1');
+
+    const { availableModels, preferredModels } = req.body || {};
+    console.log(
+      `${availableModels.length} available models and ${preferredModels.length} preferred models for worker ${worker}`
+    );
+    console.log('Typeof availableModels:', typeof availableModels);
+    console.log('Typeof preferredModels:', typeof preferredModels);
+    console.log('Available models:', availableModels.join(' and'));
+    console.log(
+      `Worker ${worker} fetching query with available models: ${availableModels}, preferred models: ${preferredModels}`
+    );
+    if (!availableModels || !Array.isArray(availableModels) || availableModels.length === 0) {
+      console.error('No available models provided');
+      res.status(400).send({ status: 'error', message: 'No available models provided' });
+      return;
+    }
+
+    console.log(`Worker ${worker} fetching query with ${availableModels} and preferred models: ${preferredModels}`);
+    // @TODO Clean up any timed out queries
+    // Fetch the next query matching a preferred model
+    let results: RowDataPacket[] = [];
+    let list;
+    let query;
+    if (preferredModels.length > 0) {
+      query = 'SELECT * FROM queries WHERE status = 0 AND model IN (?) ORDER BY date ASC LIMIT 1';
+      list = preferredModels;
+      results = await runQuery<RowDataPacket[]>(query, [list]);
+    }
+    if (results.length === 0) {
+      // If no preferred model matches, try any available model
+      query = 'SELECT * FROM queries WHERE status = 0 AND model IN (?) ORDER BY date ASC LIMIT 1';
+      list = availableModels;
+      results = await runQuery<RowDataPacket[]>(query, [list]);
+    }
+    console.log(`Worker ${worker} used ${query} with ${list} and found these prompts:`, results);
     if (results.length > 0) {
       res.json(results[0]);
       // Mark worker as in progress
@@ -221,7 +253,7 @@ export const registerAPI = (app: Express) => {
       const [results, fields] = await dbPool.query(sql, params);
       return results as T;
     } catch (error) {
-      //console.error('SQL Error executing query:', sql, 'Params:', params, 'Error:', error);
+      console.error('SQL Error executing query:', sql, 'Params:', params, 'Error:', error);
       throw error; // Re-throw the error for the caller to handle
     }
   }

@@ -107,19 +107,29 @@ async function ensureOllamaIsReady(): Promise<void> {
     }
   }
   try {
-    const modelsRaw = await exec('ollama list');
-
-    console.log('Ollama server appears to be running.');
-    const models = modelsRaw.stdout
-      .split('\n')
-      .slice(1)
-      .map((line) => line.split(/\s+/)[0].trim());
+    const models = await getAvailableModels();
     console.log('Available models:', models.join(', ') || 'No models found.');
-    await fetchMissingModels(models);
+    //await fetchMissingModels(models);
   } catch (error) {
     console.warn('Ollama server might not be running or responding. `ollama run` might start it.');
     console.warn('If you encounter issues, ensure the Ollama application/service is running.');
   }
+}
+
+async function getAvailableModels(): Promise<string[]> {
+  const modelsRaw = await exec('ollama list');
+
+  console.log('Ollama server appears to be running.');
+  const models = modelsRaw.stdout
+    .split('\n')
+    .slice(1)
+    .map((line) => line.split(/\s+/)[0].trim());
+  return models;
+}
+async function getLoadedModels(): Promise<string[]> {
+  const ollama = new Ollama();
+  const running = await ollama.ps();
+  return running.models.map((model) => model.model);
 }
 
 async function fetchMissingModels(models: string[]) {
@@ -170,13 +180,17 @@ async function fetchMissingModels(models: string[]) {
  */
 async function getPendingPrompt(): Promise<any | null> {
   // Use fetch to fetch queries from /api/worker/queries
-  const path = `${config.host}/api/worker/query`;
+  const path = `${config.host}/api/worker/fetch-query`;
   const queries = await fetch(path, {
-    method: 'GET',
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${workerId}`,
     },
+    body: JSON.stringify({
+      preferredModels: await getLoadedModels(),
+      availableModels: await getAvailableModels(),
+    }),
   });
   if (!queries.ok) {
     console.log(queries);
