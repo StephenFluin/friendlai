@@ -282,11 +282,63 @@ async function updatePrompt(
   }
 }
 
+async function sendStartupInfo() {
+  // Gather system info
+  const cpu = os.cpus()[0]?.model || 'unknown';
+  const platform = os.platform();
+  const totalmem = os.totalmem();
+  // Try to get GPU info (best effort, platform dependent)
+  let gpu: string | null = null;
+  let gpu_memory: number | null = null;
+  try {
+    if (platform === 'linux' || platform === 'darwin') {
+      const { stdout } = await exec('lspci | grep -i vga || system_profiler SPDisplaysDataType');
+      gpu = stdout.trim() || 'unknown';
+      // Try to get GPU memory (Linux/NVIDIA only)
+      if (platform === 'linux') {
+        try {
+          const { stdout: nvidiaSmi } = await exec('nvidia-smi --query-gpu=memory.total --format=csv,noheader');
+          gpu_memory = parseInt(nvidiaSmi.trim()) * 1024 * 1024; // MB to bytes
+        } catch {}
+      }
+    } else if (platform === 'win32') {
+      const { stdout } = await exec('wmic path win32_VideoController get name');
+      gpu = stdout.split('\n')[1]?.trim() || 'unknown';
+      // Try to get GPU memory (Windows)
+      const { stdout: memOut } = await exec('wmic path win32_VideoController get AdapterRAM');
+      const memLine = memOut.split('\n')[1]?.trim();
+      gpu_memory = memLine ? parseInt(memLine) : null;
+    }
+  } catch {}
+
+  // POST to /api/worker/startup
+  try {
+    await fetch(`${config.host}/api/worker/startup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${workerId}`,
+      },
+      body: JSON.stringify({
+        cpu,
+        platform,
+        system_memory: totalmem,
+        gpu,
+        gpu_memory,
+      }),
+    });
+    console.log('Startup info sent to server.');
+  } catch (err) {
+    console.error('Failed to send startup info:', err);
+  }
+}
+
 // --- Main Application Logic ---
 
 async function main() {
   console.log('Starting Friendlai Worker...');
   console.log(`Worker ID: ${workerId}`);
+  sendStartupInfo();
 
   try {
     await ensureOllamaIsReady();

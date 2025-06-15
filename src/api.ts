@@ -150,6 +150,17 @@ export const registerAPI = (app: Express) => {
     res.json({ id: queryId });
   });
 
+  app.post('/api/worker/startup', async (req, res) => {
+    const worker = getBearer(req);
+    const { cpu, platform, system_memory, gpu, gpu_memory } = req.body;
+
+    runQuery(
+      `INSERT INTO workers 
+      (id, worker, cpu, platform, system_memory, gpu, gpu_memory)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), worker, cpu, platform, system_memory, gpu, gpu_memory]
+    );
+  });
   app.get('/api/worker/models', async (req, res) => {
     // This endpoint is for the worker to fetch the list of models
     const results = await runQuery<RowDataPacket[]>(`SELECT DISTINCT model
