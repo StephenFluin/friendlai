@@ -1,0 +1,89 @@
+name: Build and Release Binaries
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build on ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      matrix:
+        include:
+          - platform: ubuntu-latest
+            platform_name: Linux
+            output_suffix: linux
+          - platform: macos-latest # Should default to ARM64/M1 for newer images
+            platform_name: macOS
+            output_suffix: macos
+          - platform: windows-latest
+            platform_name: Windows
+            output_suffix: windows.exe
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Get short SHA
+        id: vars
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Define output name
+        id: names
+        run: |
+          echo "outfile=dist/friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
+          echo "artifact_name=friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Build binary
+        run: bun build worker/worker.ts --compile --outfile ${{ steps.names.outputs.outfile }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.names.outputs.artifact_name }}
+          path: ${{ steps.names.outputs.outfile }}
+          if-no-files-found: error # Ensure the build actually produced a file
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' # Only run on pushes to main
+    permissions:
+      contents: write # Required to create a release
+    steps:
+      - name: Get short SHA
+        id: vars
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/ # Download all artifacts to a directory
+
+      - name: List downloaded files (for debugging)
+        run: |
+          ls -R artifacts/
+          echo "SHA is ${{ steps.vars.outputs.sha }}"
+        shell: bash
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}-${{ steps.vars.outputs.sha }}
+          name: Release v${{ github.run_number }} (${{ steps.vars.outputs.sha }})
+          files: |
+            artifacts/friendlai-${{ steps.vars.outputs.sha }}-linux/friendlai-${{ steps.vars.outputs.sha }}-linux
+            artifacts/friendlai-${{ steps.vars.outputs.sha }}-macos/friendlai-${{ steps.vars.outputs.sha }}-macos
+            artifacts/friendlai-${{ steps.vars.outputs.sha }}-windows.exe/friendlai-${{ steps.vars.outputs.sha }}-windows.exe
+          body: |
+            Automated release of Friendlai binaries.
+            Commit: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
