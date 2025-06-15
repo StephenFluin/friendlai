@@ -25,6 +25,8 @@ if (!fs.existsSync('worker.json')) {
 const workerConfig = JSON.parse(fs.readFileSync('worker.json', 'utf8'));
 const workerId = process.env.WORKER_ID || workerConfig.id;
 
+const ollama = new Ollama();
+
 const OLLAMA_INSTALL_URL = 'https://ollama.com/install.sh';
 const POLLING_INTERVAL_SECONDS = process.env.POLLING_INTERVAL_SECONDS
   ? parseInt(process.env.POLLING_INTERVAL_SECONDS, 10)
@@ -117,21 +119,19 @@ async function ensureOllamaIsReady(): Promise<void> {
 }
 
 async function getAvailableModels(): Promise<string[]> {
-  const modelsRaw = await exec('ollama list');
-
-  console.log('Ollama server appears to be running.');
-  const models = modelsRaw.stdout
-    .split('\n')
-    .slice(1)
-    .map((line) => line.split(/\s+/)[0].trim());
-  return models;
+  const models = await ollama.list();
+  return models.models.map((model) => model.name);
 }
 async function getLoadedModels(): Promise<string[]> {
-  const ollama = new Ollama();
   const running = await ollama.ps();
   return running.models.map((model) => model.model);
 }
 
+/**
+ * Should I use this? When should I fetch missing models? How do I know a worker can handle it?
+ * Do I let the user choose a set of models, disk space? Do I look at their RAM and cpu?
+ * Do users get a choice?
+ */
 async function fetchMissingModels(models: string[]) {
   const requiredModels: string[] = await fetch(`${config.host}/api/worker/models`)
     .then((response) => response.json())
@@ -149,7 +149,6 @@ async function fetchMissingModels(models: string[]) {
     for (const model of missingModels) {
       try {
         console.log(`Pulling missing model: ${model}`);
-        const ollama = new Ollama();
         const stream = await ollama.pull({ model, stream: true });
         // Give progress updates every 10 seconds
         let time = Date.now() - 10000;
@@ -199,10 +198,9 @@ async function getPendingPrompt(): Promise<any | null> {
   }
   const data = await queries.json();
   if (Array.isArray(data) && data.length === 0) {
-    console.log(`No pending prompts found at ${path}.`);
+    console.log(`No pending prompts found at ${path}. Sleeping for ${POLLING_INTERVAL_SECONDS} seconds...`);
+    sleep(POLLING_INTERVAL_SECONDS * 1000);
     return null;
-  } else {
-    console.log(`Found ${data.length} pending prompts at ${path}.`);
   }
 
   // Post a status update to the server via fetch to api
@@ -221,13 +219,8 @@ async function getPendingPrompt(): Promise<any | null> {
   return prompt;
 }
 
-// Define timeouts based on the original script's values
-const DEFAULT_RUN_TIMEOUT_MS = 30 * 1000; // 30 seconds for initial attempt
-const PULL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes for model pulling
-const RETRY_RUN_TIMEOUT_MS = 1 * 60 * 1000; // 1 minute for retry attempt after pull
-
 /**
- * Runs a prompt against the Ollama API, with logic to pull the model if not found.
+ * Runs a prompt against the Ollama API. Models should already match because we fetch with our preferred and available models.
  *
  * @param promptText The text of the prompt.
  * @param modelName The name of the model to use (e.g., "llama3:latest").
@@ -236,15 +229,8 @@ const RETRY_RUN_TIMEOUT_MS = 1 * 60 * 1000; // 1 minute for retry attempt after 
 export async function runOllamaPrompt(promptText: string, modelName: string): Promise<[string, number]> {
   // Initialize the Ollama client. Assumes Ollama server is running on default host (http://localhost:11434).
   // You can configure the host if needed: new Ollama({ host: "http://custom_host:port" })
-  const ollama = new Ollama();
-  console.log(`Running prompt with model "${modelName}" using Ollama JS API...`);
+  console.log(`Running prompt with model "${modelName}".`);
   const models = await ollama.list();
-  models.models[0].model;
-  if (!models.models.find((item) => item.model === modelName)) {
-    console.log(`Model "${modelName}" not found. Pulling requested models...`);
-    await ollama.pull({ model: modelName });
-    console.log('model downloaded!');
-  }
 
   const response: GenerateResponse = await ollama.generate({
     model: modelName,
@@ -252,8 +238,11 @@ export async function runOllamaPrompt(promptText: string, modelName: string): Pr
     stream: false, // Get the full response at once
   });
 
-  console.log(`Ran prompt with model "${modelName}". Time: ${response.eval_duration}ms.`);
-  console.log('Finished because:', response.done_reason);
+  console.log(
+    `Finished running with model "${modelName}". Time: ${Math.round(response.eval_duration / 1000 / 1000)}ms. Reason: ${
+      response.done_reason
+    }`
+  );
   return [response.response, response.eval_duration];
 }
 
@@ -296,7 +285,8 @@ async function updatePrompt(
 // --- Main Application Logic ---
 
 async function main() {
-  console.log('Starting Ollama Prompt Processor...');
+  console.log('Starting Friendlai Worker...');
+  console.log(`Worker ID: ${workerId}`);
 
   try {
     await ensureOllamaIsReady();
@@ -329,7 +319,6 @@ async function main() {
           await updatePrompt(prompt.id, 4, { errorMessage: ollamaError.message });
         }
       } else {
-        console.log(`No pending prompts found. Sleeping for ${POLLING_INTERVAL_SECONDS} seconds...`);
         await sleep(POLLING_INTERVAL_SECONDS * 1000);
       }
     } catch (error: any) {
@@ -344,7 +333,7 @@ async function main() {
       // If DB connection fails, connectToDB() inside the loop will try to re-establish.
       // If other errors, sleep and retry.
       console.log(`Sleeping for ${POLLING_INTERVAL_SECONDS} seconds before retrying...`);
-      await sleep(POLLING_INTERVAL_SECONDS * 1000);
+      // Sleeping here doesn't block the right loops
     }
   }
 }
@@ -355,46 +344,4 @@ if (require.main === module) {
     console.error('Unhandled error in main execution:', error);
     process.exit(1);
   });
-}
-
-function pull() {
-  // if (isModelNotFoundError) {
-  //     console.log(`Model "${modelName}" not found or inaccessible. Attempting to pull model...`);
-  //     const pullAbortController = new AbortController();
-  //     let pullTimeoutId: NodeJS.Timeout;
-  //     const pullTimeoutPromise = new Promise<never>((_, reject) => {
-  //       pullTimeoutId = setTimeout(() => {
-  //         const timeoutMessage = `Ollama pull for model "${modelName}" timed out after ${PULL_TIMEOUT_MS}ms.`;
-  //         console.warn(timeoutMessage);
-  //         pullAbortController.abort();
-  //       }, PULL_TIMEOUT_MS);
-  //     });
-  //     try {
-  //       const pullOperation = async () => {
-  //         const pullStream = await ollama.pull({
-  //           model: modelName,
-  //           stream: true, // Iterate over progress
-  //           signal: pullAbortController.signal,
-  //         });
-  //         let lastStatus = '';
-  //         let pullFailedInStream = false;
-  //         console.log(`Pulling "${modelName}" (this may take up to ${PULL_TIMEOUT_MS / 60000} minutes)...`);
-  //         for await (const progress of pullStream) {
-  //           lastStatus = progress.status;
-  //           if (progress.error) {
-  //             console.error(`Error detail during pull stream for "${modelName}": ${progress.error}`);
-  //             pullFailedInStream = true;
-  //             throw new Error(`Streamed pull for "${modelName}" reported an error: ${progress.error}`);
-  //           }
-  //           // You can log more detailed progress here if desired:
-  //           // console.log(`Pulling ${modelName}: ${progress.status} ${progress.completed || ''}/${progress.total || ''}`);
-  //         }
-  //         if (!pullFailedInStream) {
-  //           // A successful pull typically ends with a status like "success".
-  //           // If the stream completes without `progress.error`, it's generally successful.
-  //           console.log(`Pull stream for "${modelName}" completed. Last status: ${lastStatus}`);
-  //         }
-  //       };
-  //       await Promise.race([pullOperation(), pullTimeoutPromise]);
-  //       clearTimeout(pullTimeoutId!);
 }

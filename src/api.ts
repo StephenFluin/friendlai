@@ -163,23 +163,13 @@ export const registerAPI = (app: Express) => {
     const worker = getBearer(req);
 
     const { availableModels, preferredModels } = req.body || {};
-    console.log(
-      `${availableModels.length} available models and ${preferredModels.length} preferred models for worker ${worker}`
-    );
-    console.log('Typeof availableModels:', typeof availableModels);
-    console.log('Typeof preferredModels:', typeof preferredModels);
-    console.log('Available models:', availableModels.join(' and'));
-    console.log(
-      `Worker ${worker} fetching query with available models: ${availableModels}, preferred models: ${preferredModels}`
-    );
     if (!availableModels || !Array.isArray(availableModels) || availableModels.length === 0) {
-      console.error('No available models provided');
       res.status(400).send({ status: 'error', message: 'No available models provided' });
       return;
     }
 
     console.log(`Worker ${worker} fetching query with ${availableModels} and preferred models: ${preferredModels}`);
-    // @TODO Clean up any timed out queries
+    await runQuery(`UPDATE queries SET status = 0 WHERE status = 1 AND updated < NOW() - INTERVAL 15 MINUTE`);
     // Fetch the next query matching a preferred model
     let results: RowDataPacket[] = [];
     let list;
@@ -195,11 +185,9 @@ export const registerAPI = (app: Express) => {
       list = availableModels;
       results = await runQuery<RowDataPacket[]>(query, [list]);
     }
-    console.log(`Worker ${worker} used ${query} with ${list} and found these prompts:`, results);
     if (results.length > 0) {
       res.json(results[0]);
-      // Mark worker as in progress
-      // await runQuery('UPDATE queries SET status = 1 WHERE id = ? LIMIT 1', [results[0]['id']]);
+      // Track that we shared this job with a worker (status 0, still pending)
       await runQuery('INSERT INTO works (id, query, worker, status) VALUES (?, ?, ?, ?)', [
         uuidv4(),
         results[0]['id'],
@@ -211,8 +199,8 @@ export const registerAPI = (app: Express) => {
     }
   });
 
+  // Worker to update the status of a query during and after processing
   app.put('/api/worker/query/:id', async (req, res) => {
-    // This endpoint is for the worker to update the status of a query after processing
     const queryId = req.params.id;
     const [status, result, error_message, processing_time_ms] = [
       req.body.status || -1,
@@ -231,7 +219,7 @@ export const registerAPI = (app: Express) => {
       [status, result, error_message, processing_time_ms, queryId]
     );
     await runQuery(
-      'INSERT INTO works (id, query, worker, status, processing_time_ms, error_message) VALUES (?, ?, ?, ?)',
+      'INSERT INTO works (id, query, worker, status, processing_time_ms, error_message) VALUES (?, ?, ?, ?, ?, ?)',
       [uuidv4(), queryId, worker, status, processing_time_ms, error_message || null]
     );
     res.send({ status: 'success' });
