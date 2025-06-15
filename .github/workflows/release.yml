@@ -7,20 +7,8 @@ on:
 
 jobs:
   build:
-    name: Build on ${{ matrix.platform_name }}
-    runs-on: ${{ matrix.platform }}
-    strategy:
-      matrix:
-        include:
-          - platform: ubuntu-latest
-            platform_name: Linux
-            output_suffix: linux
-          - platform: macos-latest # Should default to ARM64/M1 for newer images
-            platform_name: macOS
-            output_suffix: macos
-          - platform: windows-latest
-            platform_name: Windows
-            output_suffix: windows.exe
+    name: Build Binaries
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,25 +21,24 @@ jobs:
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
         shell: bash
 
-      - name: Define output name
-        id: names
-        run: |
-          echo "outfile=dist/friendlai-${{ steps['vars'].outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
-          echo "artifact_name=friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
-        shell: bash
-
       - name: Install npm dependencies
         run: npm install ci
 
-      - name: Build binary
-        run: bun build worker/worker.ts --compile --outfile ${{ steps.names.outputs.outfile }}
+      - name: Build Linux Binary
+        run: bun build worker/worker.ts --compile --target=bun-linux-x64-modern --outfile dist/friendlai-${{ env.sha }}-linux
 
-      - name: Upload artifact
+      - name: Build Windows Binary
+        run: bun build worker/worker.ts --compile --target=bun-windows-x64-modern --outfile dist/friendlai-${{ env.sha }}-windows.exe
+
+      - name: Build macOS Binary
+        run: bun build worker/worker.ts --compile --target=bun-darwin-arm64 --outfile dist/friendlai-${{ env.sha }}-macos
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.names.outputs.artifact_name }}
-          path: ${{ steps.names.outputs.outfile }}
-          if-no-files-found: error # Ensure the build actually produced a file
+          name: friendlai-binaries-${{ env.sha }}
+          path: dist/
+          if-no-files-found: error
 
   create-release:
     name: Create GitHub Release
