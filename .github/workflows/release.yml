@@ -24,6 +24,9 @@ jobs:
         run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
         shell: bash
 
+      - name: Install NPM dependencies
+        run: npm install ci
+
       - name: Build Linux Binary
         run: bun build worker/worker.ts --compile --target=bun-linux-x64-modern --outfile dist/friendlai-${{ env.sha }}-linux
 
