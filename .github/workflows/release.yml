@@ -30,12 +30,13 @@ jobs:
 
       - name: Get short SHA
         id: vars
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        shell: bash
 
       - name: Define output name
         id: names
         run: |
-          echo "outfile=dist/friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
+          echo "outfile=dist/friendlai-${{ steps['vars'].outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
           echo "artifact_name=friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
         shell: bash
 
@@ -76,15 +77,18 @@ jobs:
           echo "SHA is ${{ steps.vars.outputs.sha }}"
         shell: bash
 
+      - name: Debug Variables
+        run: |
+          echo "Run number: ${{ github.run_number }}"
+          echo "SHA: ${{ steps.vars.outputs.sha }}"
+        shell: bash
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ github.run_number }}-${{ steps.vars.outputs.sha }}
-          name: Release v${{ github.run_number }} (${{ steps.vars.outputs.sha }})
-          files: |
-            artifacts/friendlai-${{ steps.vars.outputs.sha }}-linux/friendlai-${{ steps.vars.outputs.sha }}-linux
-            artifacts/friendlai-${{ steps.vars.outputs.sha }}-macos/friendlai-${{ steps.vars.outputs.sha }}-macos
-            artifacts/friendlai-${{ steps.vars.outputs.sha }}-windows.exe/friendlai-${{ steps.vars.outputs.sha }}-windows.exe
+          tag_name: v${{ github.run_number }}-${{ env.sha }}
+          name: Release v${{ github.run_number }} (${{ env.sha }})
+          files: artifacts/*
           body: |
             Automated release of Friendlai binaries.
             Commit: ${{ github.sha }}
