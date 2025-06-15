@@ -39,6 +39,9 @@ jobs:
           echo "artifact_name=friendlai-${{ steps.vars.outputs.sha }}-${{ matrix.output_suffix }}" >> $GITHUB_OUTPUT
         shell: bash
 
+      - name: Install npm dependencies
+        run: npm install ci
+
       - name: Build binary
         run: bun build worker/worker.ts --compile --outfile ${{ steps.names.outputs.outfile }}
 
