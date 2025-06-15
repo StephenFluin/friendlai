@@ -36,6 +36,17 @@ jobs:
       - name: Build macOS Binary
         run: bun build worker/worker.ts --compile --target=bun-darwin-arm64 --outfile dist/friendlai-${{ env.sha }}-macos
 
+      - name: Create JSON file with filenames, SHA, and date
+        run: |
+          echo '{
+            "linux": "friendlai-${{ env.sha }}-linux",
+            "windows": "friendlai-${{ env.sha }}-windows.exe",
+            "macos": "friendlai-${{ env.sha }}-macos",
+            "sha": "${{ env.sha }}",
+            "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }' > dist/release-info.json
+        shell: bash
+
       - name: List built files (for debugging)
         run: ls -R dist/
         shell: bash
