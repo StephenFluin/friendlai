@@ -58,14 +58,16 @@ jobs:
 
       - name: Create JSON file with filenames, SHA, and date
         run: |
-          echo '{
+          cat <<EOF > dist/release-info.json
+          {
             "linux": "friendlai-linux",
             "windows": "friendlai-windows.exe",
             "macos": "friendlai-macos",
             "sha": "${{ env.sha }}",
             "version": "$(jq -r '.version' worker/version.json)",
             "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-          }' > dist/release-info.json
+          }
+          EOF
         shell: bash
 
       - name: List built files (for debugging)
