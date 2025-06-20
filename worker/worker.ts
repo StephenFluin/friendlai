@@ -1,3 +1,4 @@
+import { Command } from 'commander';
 import * as child_process from 'child_process';
 import * as os from 'os';
 import * as util from 'util';
@@ -5,18 +6,13 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import { GenerateResponse, Ollama } from 'ollama';
 import { v4 as uuidv4 } from 'uuid';
+import * as version from './version.json';
 
 // Load environment variables from .env file
 dotenv.config();
 
 // Promisify exec for cleaner async/await usage
 const exec = util.promisify(child_process.exec);
-
-// --- Configuration ---
-// Database credentials will now be primarily sourced from the .env file
-const config = {
-  host: process.env.HOST || 'https://friendlai.xyz',
-};
 
 // Read worker ID from worker.json
 if (!fs.existsSync('worker.json')) {
@@ -26,11 +22,7 @@ const workerConfig = JSON.parse(fs.readFileSync('worker.json', 'utf8'));
 const workerId = process.env.WORKER_ID || workerConfig.id;
 
 const ollama = new Ollama();
-
 const OLLAMA_INSTALL_URL = 'https://ollama.com/install.sh';
-const POLLING_INTERVAL_SECONDS = process.env.POLLING_INTERVAL_SECONDS
-  ? parseInt(process.env.POLLING_INTERVAL_SECONDS, 10)
-  : 20;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -43,7 +35,6 @@ function sleep(ms: number): Promise<void> {
 async function isOllamaInstalled(): Promise<boolean> {
   try {
     await exec('ollama --version');
-    console.log('Ollama is already installed.');
     return true;
   } catch (error) {
     console.log('Ollama not found. Attempting installation...');
@@ -133,7 +124,7 @@ async function getLoadedModels(): Promise<string[]> {
  * Do users get a choice?
  */
 async function fetchMissingModels(models: string[]) {
-  const requiredModels: string[] = await fetch(`${config.host}/api/worker/models`)
+  const requiredModels: string[] = await fetch(`${options.host}/api/worker/models`)
     .then((response) => response.json())
     .then((data) => data || [])
     .catch((error) => {
@@ -179,7 +170,7 @@ async function fetchMissingModels(models: string[]) {
  */
 async function getPendingPrompt(): Promise<any | null> {
   // Use fetch to fetch queries from /api/worker/queries
-  const path = `${config.host}/api/worker/fetch-query`;
+  const path = `${options.host}/api/worker/fetch-query`;
   const queries = await fetch(path, {
     method: 'POST',
     headers: {
@@ -198,8 +189,8 @@ async function getPendingPrompt(): Promise<any | null> {
   }
   const data = await queries.json();
   if (Array.isArray(data) && data.length === 0) {
-    console.log(`No pending prompts found at ${path}. Sleeping for ${POLLING_INTERVAL_SECONDS} seconds...`);
-    sleep(POLLING_INTERVAL_SECONDS * 1000);
+    console.log(`No pending prompts found at ${path}. Sleeping for ${options.polling} seconds...`);
+    sleep(options.polling * 1000);
     return null;
   }
 
@@ -207,7 +198,7 @@ async function getPendingPrompt(): Promise<any | null> {
   const prompt = data;
   console.log(`Found pending prompt ID: ${prompt.id}, query: "${prompt.query}"`);
   // Update the prompt status to 'processing' (status = 1)
-  fetch(`${config.host}/api/worker/query/${prompt.id}`, {
+  fetch(`${options.host}/api/worker/query/${prompt.id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -248,15 +239,10 @@ export async function runOllamaPrompt(promptText: string, modelName: string): Pr
 
 /**
  * Updates a prompt in the database with the result or an error message.
- * @param db - The MySQL connection object.
- * @param promptId - The ID of the prompt to update.
- * @param status - The new status ('completed' or 'error').
- * @param resultText - The result text from Ollama (optional).
- * @param errorMessage - An error message if processing failed (optional).
  */
 async function updatePrompt(
   promptId: number,
-  status: 3 | 4,
+  status: 3 | 4, // success or failure
   {
     resultText,
     errorMessage,
@@ -264,7 +250,7 @@ async function updatePrompt(
   }: { resultText?: string; errorMessage?: string; processing_time_ms?: number }
 ): Promise<void> {
   try {
-    await fetch(`${config.host}/api/worker/query/${promptId}`, {
+    await fetch(`${options.host}/api/worker/query/${promptId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -313,7 +299,7 @@ async function sendStartupInfo() {
 
   // POST to /api/worker/startup
   try {
-    await fetch(`${config.host}/api/worker/startup`, {
+    await fetch(`${options.host}/api/worker/startup`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -333,8 +319,6 @@ async function sendStartupInfo() {
   }
 }
 
-// --- Main Application Logic ---
-
 async function main() {
   console.log('Starting Friendlai Worker...');
   console.log(`Worker ID: ${workerId}`);
@@ -342,8 +326,8 @@ async function main() {
 
   try {
     await ensureOllamaIsReady();
-  } catch (ollamaError) {
-    console.error('Failed to ensure Ollama is ready. Exiting.', ollamaError);
+  } catch (error) {
+    console.error('Failed to ensure Ollama is ready:', error);
     process.exit(1);
   }
 
@@ -354,7 +338,7 @@ async function main() {
 
       if (prompt) {
         try {
-          fetch(`${config.host}/api/worker/query/${prompt.id}`, {
+          fetch(`${options.host}/api/worker/query/${prompt.id}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -371,7 +355,7 @@ async function main() {
           await updatePrompt(prompt.id, 4, { errorMessage: ollamaError.message });
         }
       } else {
-        await sleep(POLLING_INTERVAL_SECONDS * 1000);
+        await sleep(options.polling * 1000);
       }
     } catch (error: any) {
       console.error('An error occurred in the main loop:', error.message);
@@ -382,18 +366,28 @@ async function main() {
           console.error('Additionally, failed to update prompt status after main loop error:', updateErr);
         }
       }
-      // If DB connection fails, connectToDB() inside the loop will try to re-establish.
-      // If other errors, sleep and retry.
-      console.log(`Sleeping for ${POLLING_INTERVAL_SECONDS} seconds before retrying...`);
-      // Sleeping here doesn't block the right loops
+      console.log(`Sleeping for ${options.polling} seconds before retrying...`);
     }
   }
 }
 
-// --- Script Execution ---
-if (require.main === module) {
-  main().catch((error) => {
-    console.error('Unhandled error in main execution:', error);
-    process.exit(1);
-  });
-}
+// Initialize Commander
+const program = new Command();
+program.name('friendlai-worker').description('CLI for managing Friendlai Worker').version(version.version);
+
+// Add options and commands
+program
+  .option(
+    '-p, --polling <seconds>',
+    'Set polling interval in seconds',
+    (value) => parseInt(value, 10), // Explicitly specify base 10
+    20
+  )
+  .option('-h, --host <url>', 'Set the host URL for the Friendlai server', process.env.HOST || 'https://friendlai.xyz');
+
+program.command('run', { isDefault: true }).description('Run the Friendlai Worker').action(main);
+program.command('fetch').description('Fetch popularly used models from the ollama').action(fetchMissingModels);
+
+program.parse(process.argv);
+const options = program.opts();
+console.log('Options:', options);

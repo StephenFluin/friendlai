@@ -27,6 +27,26 @@ jobs:
       - name: Install NPM dependencies
         run: npm install ci
 
+      - name: Update Version in worker/version.json
+        run: |
+          VERSION_FILE="worker/version.json"
+          # Read the current version, assuming it's in a format like "0.0.0"
+          CURRENT_VERSION=$(jq -r '.version' "$VERSION_FILE")
+
+          # Extract the major and minor parts (e.g., "0.0")
+          MAJOR_MINOR_VERSION=$(echo "$CURRENT_VERSION" | sed -E 's/\.[0-9]+$//')
+
+          # Get the GitHub run number
+          RUN_NUMBER=${{ github.run_number }}
+
+          # Construct the new version string
+          NEW_VERSION="${MAJOR_MINOR_VERSION}.${RUN_NUMBER}"
+
+          # Update the version in the JSON file
+          jq --arg newVersion "$NEW_VERSION" '.version = $newVersion' "$VERSION_FILE" > temp.json && mv temp.json "$VERSION_FILE"
+
+          echo "Updated version in $VERSION_FILE to $NEW_VERSION"
+
       - name: Build Linux Binary
         run: bun build worker/worker.ts --compile --target=bun-linux-x64-modern --outfile dist/friendlai-${{ env.sha }}-linux
 
