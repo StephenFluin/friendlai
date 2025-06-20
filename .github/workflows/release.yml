@@ -74,6 +74,33 @@ jobs:
         run: ls -R dist/
         shell: bash
 
+      - name: Archive Existing Release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            // Find the latest release
+            const latestRelease = releases.find(release => release.tag_name === 'release');
+
+            if (latestRelease) {
+              console.log(`Archiving release: ${latestRelease.name} (${latestRelease.tag_name})`);
+
+              // Update the release name to indicate it's archived
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: latestRelease.id,
+                name: `${latestRelease.name} (Archived)`,
+              });
+
+            } else {
+              console.log('No existing release found to archive.');
+            }
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
