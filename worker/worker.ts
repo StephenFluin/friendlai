@@ -440,4 +440,3 @@ program.command('fetch').description('Fetch popularly used models from the ollam
 
 program.parse(process.argv);
 const options = program.opts();
-console.log('Options:', options);
