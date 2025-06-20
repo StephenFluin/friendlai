@@ -319,10 +319,60 @@ async function sendStartupInfo() {
   }
 }
 
+async function checkLatestVersion() {
+  const info = await fetch('https://github.com/StephenFluin/friendlai/releases/latest/download/release-info.json');
+  const latestRelease = await info.json();
+
+  // Compare the version attribute against version.version
+  const currentVersion = version.version;
+  // If the patch is 0, we consider it a pre-release
+  if (currentVersion.endsWith('.0') || currentVersion === latestRelease.version) {
+    console.log('Up to date or prerelease. Latest:', latestRelease.version, ' Current: ', currentVersion);
+    return;
+  }
+  console.log(`New version available: ${latestRelease.version}`);
+  // Download the latest release and execute it instead of this one
+  // latest release will be in linux, windows, or macos property of latestRelease, grab the right one for our platform
+  const platform = os.platform();
+  let downloadUrl = '';
+  if (platform === 'linux') {
+    downloadUrl = latestRelease.linux;
+  } else if (platform === 'darwin') {
+    downloadUrl = latestRelease.macos;
+  } else if (platform === 'win32') {
+    downloadUrl = latestRelease.windows;
+  } else {
+    console.error(`Unsupported platform: ${platform}. Cannot download latest release.`);
+    return;
+  }
+  downloadUrl = `https://github.com/stephenfluin/friendlai/releases/latest/download/${downloadUrl}`;
+  console.log(`Downloading latest release from ${downloadUrl}...`);
+  const response = await fetch(downloadUrl);
+  if (!response.ok) {
+    console.error(`Failed to download latest release: ${response.statusText}`);
+    return;
+  }
+  // Replace the existing binary with the new one
+  const buffer = await response.arrayBuffer();
+  // get current binary path
+  console.log('Replacing current binary with the latest release...');
+  console.log('Using argv', process.argv);
+  const currentBinaryPath = process.argv[1];
+
+  // Write the new binary to the current path
+  fs.writeFileSync(currentBinaryPath, Buffer.from(buffer));
+  fs.chmodSync(currentBinaryPath, 0o755); // Make it executable
+  console.log('New binary downloaded. Please restart the worker to use the latest version.');
+  console.log('Exiting current worker process...');
+  process.exit(0);
+}
+
 async function main() {
   console.log('Starting Friendlai Worker...');
   console.log(`Worker ID: ${workerId}`);
   sendStartupInfo();
+
+  await checkLatestVersion();
 
   try {
     await ensureOllamaIsReady();
