@@ -335,17 +335,18 @@ async function checkLatestVersion() {
   // latest release will be in linux, windows, or macos property of latestRelease, grab the right one for our platform
   const platform = os.platform();
   let downloadUrl = '';
+  let binaryName = '';
   if (platform === 'linux') {
-    downloadUrl = latestRelease.linux;
+    binaryName = latestRelease.linux;
   } else if (platform === 'darwin') {
-    downloadUrl = latestRelease.macos;
+    binaryName = latestRelease.macos;
   } else if (platform === 'win32') {
-    downloadUrl = latestRelease.windows;
+    binaryName = latestRelease.windows;
   } else {
     console.error(`Unsupported platform: ${platform}. Cannot download latest release.`);
     return;
   }
-  downloadUrl = `https://github.com/stephenfluin/friendlai/releases/latest/download/${downloadUrl}`;
+  downloadUrl = `https://github.com/stephenfluin/friendlai/releases/latest/download/${binaryName}`;
   console.log(`Downloading latest release from ${downloadUrl}...`);
   const response = await fetch(downloadUrl);
   if (!response.ok) {
@@ -356,8 +357,7 @@ async function checkLatestVersion() {
   const buffer = await response.arrayBuffer();
   // get current binary path
   console.log('Replacing current binary with the latest release...');
-  console.log('Using argv', process.argv);
-  const currentBinaryPath = process.argv[1];
+  const currentBinaryPath = binaryName;
 
   // Write the new binary to the current path
   fs.writeFileSync(currentBinaryPath, Buffer.from(buffer));
@@ -372,7 +372,9 @@ async function main() {
   console.log(`Worker ID: ${workerId}`);
   sendStartupInfo();
 
-  await checkLatestVersion();
+  if (!options.skipUpdateCheck) {
+    await checkLatestVersion();
+  }
 
   try {
     await ensureOllamaIsReady();
@@ -433,7 +435,8 @@ program
     (value) => parseInt(value, 10), // Explicitly specify base 10
     20
   )
-  .option('-h, --host <url>', 'Set the host URL for the Friendlai server', process.env.HOST || 'https://friendlai.xyz');
+  .option('-h, --host <url>', 'Set the host URL for the Friendlai server', process.env.HOST || 'https://friendlai.xyz')
+  .option('--skip-update-check', 'Skip checking for updates on startup', false);
 
 program.command('run', { isDefault: true }).description('Run the Friendlai Worker').action(main);
 program.command('fetch').description('Fetch popularly used models from the ollama').action(fetchMissingModels);
