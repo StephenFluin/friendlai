@@ -24,6 +24,28 @@ const workerId = process.env.WORKER_ID || workerConfig.id;
 const ollama = new Ollama();
 const OLLAMA_INSTALL_URL = 'https://ollama.com/install.sh';
 
+// Initialize Commander
+const program = new Command();
+program.name('friendlai-worker').description('CLI for managing Friendlai Worker').version(version.version);
+
+// Add options and commands
+program
+  .option(
+    '-p, --polling <seconds>',
+    'Set polling interval in seconds',
+    (value) => parseInt(value, 10), // Explicitly specify base 10
+    20
+  )
+  .option('-h, --host <url>', 'Set the host URL for the Friendlai server', process.env.HOST || 'https://friendlai.xyz')
+  .option('--skip-update-check', 'Skip checking for updates on startup', false);
+
+const options = program.opts();
+
+program.command('run', { isDefault: true }).description('Run the Friendlai Worker').action(main);
+program.command('fetch').description('Fetch popularly used models from the ollama').action(fetchMissingModels);
+
+program.parse(process.argv);
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -422,24 +444,3 @@ async function main() {
     }
   }
 }
-
-// Initialize Commander
-const program = new Command();
-program.name('friendlai-worker').description('CLI for managing Friendlai Worker').version(version.version);
-
-// Add options and commands
-program
-  .option(
-    '-p, --polling <seconds>',
-    'Set polling interval in seconds',
-    (value) => parseInt(value, 10), // Explicitly specify base 10
-    20
-  )
-  .option('-h, --host <url>', 'Set the host URL for the Friendlai server', process.env.HOST || 'https://friendlai.xyz')
-  .option('--skip-update-check', 'Skip checking for updates on startup', false);
-
-program.command('run', { isDefault: true }).description('Run the Friendlai Worker').action(main);
-program.command('fetch').description('Fetch popularly used models from the ollama').action(fetchMissingModels);
-
-program.parse(process.argv);
-const options = program.opts();
