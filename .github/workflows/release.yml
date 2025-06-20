@@ -59,10 +59,11 @@ jobs:
       - name: Create JSON file with filenames, SHA, and date
         run: |
           echo '{
-            "linux": "friendlai-${{ env.sha }}-linux",
-            "windows": "friendlai-${{ env.sha }}-windows.exe",
-            "macos": "friendlai-${{ env.sha }}-macos",
+            "linux": "friendlai-linux",
+            "windows": "friendlai-windows.exe",
+            "macos": "friendlai-macos",
             "sha": "${{ env.sha }}",
+            "version": "$(jq -r '.version' worker/version.json)",
             "date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           }' > dist/release-info.json
         shell: bash
