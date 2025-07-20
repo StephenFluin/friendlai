@@ -90,8 +90,7 @@ export class UserStatus {
   }
   signIn(event: Event) {
     event.stopPropagation();
-    // TODO: Implement real sign-in logic
-    alert('Sign in not implemented');
+    this.userService.signIn();
     this.menuOpen.set(false);
   }
   signOut(event: Event) {

@@ -30,10 +30,8 @@ export class UserService {
       const user = this.user();
       if (user) {
         localStorage.setItem('user', JSON.stringify(user));
-        console.log('User saved to localStorage:', user);
       } else {
         localStorage.removeItem('user');
-        console.log('User removed from localStorage');
       }
     });
    
@@ -43,7 +41,6 @@ export class UserService {
       try {
 
         this.user.set(JSON.parse(userData));
-        console.log('User loaded from localStorage:', this.user());
       } catch (e) {
         console.error('Failed to parse user data from localStorage', e);
       }
@@ -54,6 +51,10 @@ export class UserService {
 
     }
 
+  }
+  signIn() {
+    // Firebase auth flow for google sign-in
+    
   }
   signOut() {
     localStorage.removeItem('user');
