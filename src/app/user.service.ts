@@ -1,6 +1,7 @@
 import { isPlatformServer } from '@angular/common';
 import { inject, Injectable, signal, PLATFORM_ID, effect } from '@angular/core';
 import { v4 as uuidv4 } from 'uuid';
+import { Auth, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, User as FirebaseUser } from '@angular/fire/auth';
 
 export interface User {
   id: string;
@@ -17,6 +18,8 @@ export interface User {
 })
 export class UserService {
    user = signal<User | null>(null);
+
+   private auth = inject(Auth);
 
   constructor() {
     // Short circuit on the server to avoid accessing localStorage
@@ -52,11 +55,28 @@ export class UserService {
     }
 
   }
-  signIn() {
-    // Firebase auth flow for google sign-in
-    
+  async signIn() {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(this.auth, provider);
+      const firebaseUser: FirebaseUser = result.user;
+      const token = await firebaseUser.getIdToken();
+
+      this.user.set({
+        id: this.user()?.id || uuidv4(),
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName ?? undefined,
+        email: firebaseUser.email ?? undefined,
+        token,
+        isAdmin: false, // You may want to set this based on your app logic
+        type: 'google',
+      });
+    } catch (error) {
+      console.error('Google sign-in failed', error);
+    }
   }
-  signOut() {
+  async signOut() {
+    await firebaseSignOut(this.auth);
     localStorage.removeItem('user');
     this.user.set(this.getAnonymousUser());
   }
