@@ -1,7 +1,13 @@
 import { isPlatformServer } from '@angular/common';
 import { inject, Injectable, signal, PLATFORM_ID, effect } from '@angular/core';
 import { v4 as uuidv4 } from 'uuid';
-import { Auth, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, User as FirebaseUser } from '@angular/fire/auth';
+import {
+  Auth,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  User as FirebaseUser,
+} from '@angular/fire/auth';
 
 export interface User {
   id: string;
@@ -17,9 +23,9 @@ export interface User {
   providedIn: 'root',
 })
 export class UserService {
-   user = signal<User | null>(null);
+  user = signal<User | null>(null);
 
-   private auth = inject(Auth);
+  private auth = inject(Auth);
 
   constructor() {
     // Short circuit on the server to avoid accessing localStorage
@@ -29,7 +35,7 @@ export class UserService {
     }
 
     // Save changes to user to localStorage on update
-    effect (() => {
+    effect(() => {
       const user = this.user();
       if (user) {
         localStorage.setItem('user', JSON.stringify(user));
@@ -37,28 +43,24 @@ export class UserService {
         localStorage.removeItem('user');
       }
     });
-   
 
     const userData = localStorage.getItem('user');
     if (userData) {
       try {
-
         this.user.set(JSON.parse(userData));
       } catch (e) {
         console.error('Failed to parse user data from localStorage', e);
       }
-    }
- 
-    else {
+    } else {
       this.user.set(this.getAnonymousUser());
-
     }
-
   }
   async signIn() {
     try {
+      this.auth.useDeviceLanguage();
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(this.auth, provider);
+      console.log('Google sign-in successful', result);
       const firebaseUser: FirebaseUser = result.user;
       const token = await firebaseUser.getIdToken();
 
@@ -71,6 +73,8 @@ export class UserService {
         isAdmin: false, // You may want to set this based on your app logic
         type: 'google',
       });
+
+      // @TODO: merge anonymous data with authenticated data
     } catch (error) {
       console.error('Google sign-in failed', error);
     }
@@ -81,7 +85,7 @@ export class UserService {
     this.user.set(this.getAnonymousUser());
   }
   getAnonymousUser(): User {
-      console.log('Creating new anonymous user.');
+    console.log('Creating new anonymous user.');
 
     return {
       id: uuidv4(),
