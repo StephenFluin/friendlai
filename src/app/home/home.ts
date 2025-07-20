@@ -2,8 +2,9 @@ import { DatePipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { Footer } from '../footer/footer';
-import { User } from '../user';
+import { UserService } from '../user.service';
 import { httpResource } from '@angular/common/http';
+import { UserStatus } from '../user-status';
 
 export const statusLookup = ['Pending Assignment', 'Processing', 'UNUSED', 'Success', 'Failed'];
 
@@ -28,13 +29,13 @@ export const models = [
 
 @Component({
   selector: 'app-home',
-  imports: [DatePipe, RouterLink, Footer],
+  imports: [DatePipe, RouterLink, Footer, UserStatus],
   templateUrl: './home.html',
   styleUrls: ['./home.scss'],
 })
 export class Home {
   router = inject(Router);
-  userService = inject(User);
+  userService = inject(UserService);
 
   models = models;
 
@@ -44,7 +45,7 @@ export class Home {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.userService.id}`,
+        Authorization: `Bearer ${this.userService.user()?.id}`,
       },
     }),
     {
@@ -74,7 +75,7 @@ export class Home {
       return;
     }
 
-    const userId = this.userService.id;
+    const userId = this.userService.user()?.id;
 
     // POST to /api/queries with the data
     fetch('/api/queries', {

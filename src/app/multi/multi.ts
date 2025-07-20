@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { models } from '../home/home';
-import { User } from '../user';
+import { UserService } from '../user.service';
 import { Router, RouterLink } from '@angular/router';
 import { httpResource } from '@angular/common/http';
 
@@ -10,7 +10,7 @@ import { httpResource } from '@angular/common/http';
   templateUrl: './multi.html',
 })
 export class Multi {
-  userService = inject(User);
+  userService = inject(UserService);
   router = inject(Router);
 
   models = models;
@@ -21,7 +21,7 @@ export class Multi {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.userService.id}`,
+        Authorization: `Bearer ${this.userService.user()?.id}`,
       },
     };
   });
@@ -46,7 +46,7 @@ export class Multi {
       return;
     }
 
-    const userId = this.userService.id;
+    const userId = this.userService.user()?.id;
 
     fetch('/api/multis', {
       method: 'POST',
