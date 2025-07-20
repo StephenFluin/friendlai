@@ -63,6 +63,9 @@ jobs:
       - name: Build macOS Binary
         run: bun build worker/worker.ts --compile --target=bun-darwin-arm64 --outfile dist/friendlai-macos
 
+      - name: Ensure all release files are readable
+        run: chmod -R a+r dist/
+
       - name: Create JSON file with filenames, SHA, and date
         run: |
           cat <<EOF > dist/release-info.json
