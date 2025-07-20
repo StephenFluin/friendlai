@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { isPlatformServer } from '@angular/common';
+import { inject, Injectable, signal, PLATFORM_ID, effect } from '@angular/core';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface User {
@@ -18,15 +19,39 @@ export class UserService {
    user = signal<User | null>(null);
 
   constructor() {
+    // Short circuit on the server to avoid accessing localStorage
+    const platformId = inject(PLATFORM_ID);
+    if (isPlatformServer(platformId)) {
+      return;
+    }
+
+    // Save changes to user to localStorage on update
+    effect (() => {
+      const user = this.user();
+      if (user) {
+        localStorage.setItem('user', JSON.stringify(user));
+        console.log('User saved to localStorage:', user);
+      } else {
+        localStorage.removeItem('user');
+        console.log('User removed from localStorage');
+      }
+    });
+   
+
     const userData = localStorage.getItem('user');
     if (userData) {
       try {
+
         this.user.set(JSON.parse(userData));
+        console.log('User loaded from localStorage:', this.user());
       } catch (e) {
         console.error('Failed to parse user data from localStorage', e);
       }
-    } else {
+    }
+ 
+    else {
       this.user.set(this.getAnonymousUser());
+
     }
 
   }

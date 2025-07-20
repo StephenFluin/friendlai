@@ -23,16 +23,12 @@ import { UserService } from './user.service';
       }
       @if (menuOpen()) {
         <div class="user-dropdown">
-          @if (user()) {
-            <button (click)="signOut($event)">
             @if(user()?.type === 'anonymous') {
-              Reset
-            } @else {
-              Sign Out
-            }</button>
-          } @else {
-            <button (click)="signIn($event)">Sign In</button>
-          }
+              <button (click)="signOut($event)">Reset</button>
+              <button (click)="signIn($event)">Sign In</button>
+            } @else if(user()?.type === 'google') {
+              <button (click)="signOut($event)">Sign Out</button>
+            }
         </div>
       }
     </div>
@@ -44,7 +40,6 @@ import { UserService } from './user.service';
       align-items: center;
       cursor: pointer;
       outline: none;
-      width:300px;
     }
     .user-icon {
       margin-right: 0.5rem;
