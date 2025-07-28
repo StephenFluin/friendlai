@@ -25,11 +25,24 @@ export class App {
       } else if (pageTitle !== false) {
         this.title.setTitle('Friendlai');
       }
+      // Set canonical URL
+      this.setCanonicalUrl('https://friendlai.xy' + n.urlAfterRedirects);
+
       try {
         window.gtag('config', 'G-JP6QEC47M1', { page_path: n.urlAfterRedirects });
       } catch (err) {
         // Maybe not in a browser?
       }
     });
+  }
+
+  setCanonicalUrl(url: string) {
+    let link: HTMLLinkElement | null = document.querySelector('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'canonical');
+      document.head.appendChild(link);
+    }
+    link.setAttribute('href', url);
   }
 }
